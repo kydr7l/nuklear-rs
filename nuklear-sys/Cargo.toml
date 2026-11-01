@@ -2,6 +2,7 @@
 name = "nuklear-sys"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.82"
 links = "nuklear"
 description = "Raw FFI bindings to the Nuklear immediate mode GUI library."
 license = "MIT OR Apache-2.0"
