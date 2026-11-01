@@ -83,7 +83,7 @@ impl<'f> Context<'f> {
     /// drop(first);
     /// ```
     pub fn commands(&mut self) -> Commands<'_> {
-        self.frame_built = true;
+        self.begin_build();
         let ctx = self.raw();
         // SAFETY: the context is valid. `nk__begin` returns null or a pointer to the first command.
         let next = unsafe { sys::nk__begin(ctx) };
@@ -242,5 +242,71 @@ unsafe fn read<'a>(cmd: *const sys::nk_command) -> Command<'a> {
             }
             _ => Command::Custom,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+
+    struct Fixed;
+    impl Font for Fixed {
+        fn height(&self) -> f32 { 12.0 }
+        fn width(&self, _h: f32, t: &str) -> f32 { 6.0 * t.chars().count() as f32 }
+        fn glyph(&self, _h: f32, _c: char, _n: char) -> Glyph { Glyph { width: 6.0, height: 12.0, xadvance: 6.0, ..Default::default() } }
+        fn texture(&self) -> Handle { Handle::id(1) }
+    }
+
+    const BOUNDS: Rect = Rect { x: 0.0, y: 0.0, w: 200.0, h: 200.0 };
+
+    /// Draw a window "a" with a static popup. The popup code uses `sys`, because the wrapper has no popup method yet.
+    fn draw_a_with_popup(ctx: &mut Context<'_>) {
+        ctx.window("a", BOUNDS, PanelFlags::BORDER, |w| {
+            w.layout_row_dynamic(30.0, 1);
+            w.label("x", TextAlign::LEFT);
+            let c = w.ctx.raw();
+            let r = sys::nk_rect { x: 10.0, y: 10.0, w: 100.0, h: 100.0 };
+            // SAFETY: the context is valid and a window is open. Every successful `nk_popup_begin` gets one `nk_popup_end`.
+            unsafe {
+                if sys::nk_popup_begin(c, sys::NK_POPUP_STATIC as _, c"p".as_ptr(), 0, r) {
+                    sys::nk_layout_row_dynamic(c, 30.0, 1);
+                    sys::nk_label(c, c"popup".as_ptr(), 0);
+                    sys::nk_popup_end(c);
+                }
+            }
+        });
+    }
+
+    fn draw_b(ctx: &mut Context<'_>) {
+        ctx.window("b", BOUNDS, PanelFlags::BORDER, |w| {
+            w.layout_row_dynamic(30.0, 1);
+            (0..4).for_each(|_| w.label("x", TextAlign::LEFT));
+        });
+    }
+
+    /// A popup flag that `commands` did not reset in frame N must not reach the build of frame N+1.
+    #[test] fn old_popup_flag_does_not_reach_next_build() {
+        let font = UserFont::new(Fixed);
+        let mut ctx = Context::new(&font).unwrap();
+        draw_a_with_popup(&mut ctx);
+        ctx.clear();
+        draw_b(&mut ctx);
+        let walk: Vec<String> = ctx.commands().map(|c| format!("{c:?}")).collect();
+        ctx.clear();
+
+        let mut fresh = Context::new(&font).unwrap();
+        draw_b(&mut fresh);
+        let expected: Vec<String> = fresh.commands().map(|c| format!("{c:?}")).collect();
+        assert_eq!(walk, expected);
+    }
+
+    /// A window that is hidden after its popup must not get its popup linked. With no other window, `nk_build` would write through null.
+    #[test] fn popup_of_window_hidden_after_popup_is_not_linked() {
+        let font = UserFont::new(Fixed);
+        let mut ctx = Context::new(&font).unwrap();
+        draw_a_with_popup(&mut ctx);
+        ctx.window_show("a", ShowState::Hidden);
+        assert_eq!(ctx.commands().count(), 0);
+        ctx.clear();
     }
 }

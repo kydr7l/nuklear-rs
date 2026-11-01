@@ -160,6 +160,9 @@ impl<'f> Context<'f> {
         let (name, title) = (cstr(name), cstr(title));
         // SAFETY: the context is valid, and both strings end with NUL. Nuklear copies the strings.
         let open = unsafe { sys::nk_begin_titled(self.raw(), name.as_ptr(), title.as_ptr(), bounds.into(), flags.bits()) };
+        if !open {
+            self.reset_hidden_buffer();
+        }
         let r = open.then(|| self.panel_scope(|ctx| f(&mut Window { ctx })));
         // SAFETY: the context is valid. Every `nk_begin_titled` call needs one `nk_end` call, whatever it returned.
         unsafe { sys::nk_end(self.raw()) };
@@ -168,8 +171,65 @@ impl<'f> Context<'f> {
         r
     }
 
+    /// Empty the command buffer of the current window when it is hidden.
+    ///
+    /// `nk_begin_titled` returns early for a hidden window and does not call `nk_start`. So the buffer keeps the offsets of the last frame.
+    /// A later `window_show` could make `nk_build` and `nk__begin` use these old offsets inside the commands of this frame.
+    /// This code does what `nk_start_buffer` does, so both functions treat the window as empty.
+    fn reset_hidden_buffer(&mut self) {
+        let c = self.raw();
+        // SAFETY: the context is valid. `current` is null or points to a window of the window list. The window is not shared, because `self` is borrowed mutably.
+        unsafe {
+            let win = (*c).current;
+            if win.is_null() || (*win).flags & sys::NK_WINDOW_HIDDEN as u32 == 0 {
+                return;
+            }
+            let at = (*c).memory.allocated;
+            let buffer = &mut (*win).buffer;
+            buffer.begin = at;
+            buffer.end = at;
+            buffer.last = at;
+            buffer.clip = sys::nk_rect { x: -8192.0, y: -8192.0, w: 16384.0, h: 16384.0 }; // This is `nk_null_rect`.
+        }
+    }
+
+    /// Clear the `popup.buf.active` flag of every window for which `keep` returns `false`.
+    ///
+    /// `nk_build` links the popup commands of each window with this flag. The loop checks neither `HIDDEN` nor `seq`.
+    /// So an old flag would link offsets of an old frame, or write through a null command pointer.
+    fn drop_popup_buffers(&mut self, keep: impl Fn(*const sys::nk_window, &sys::nk_context) -> bool) {
+        let c = self.raw();
+        // SAFETY: the context is valid. The window list holds valid windows or ends with null. `self` is borrowed mutably.
+        unsafe {
+            let mut win = (*c).begin;
+            while !win.is_null() {
+                if !keep(win, &*c) {
+                    (*win).popup.buf.active = false;
+                }
+                win = (*win).next;
+            }
+        }
+    }
+
+    /// Prepare the first build of the draw commands in this frame. Later calls in the same frame do nothing.
+    ///
+    /// After the call, the frame is built and the window methods return `None` until `clear`.
+    pub(crate) fn begin_build(&mut self) {
+        if self.frame_built {
+            return;
+        }
+        // A popup flag stays set when a window is hidden after its popup, or has no commands. `nk_build` cannot link such a popup.
+        self.drop_popup_buffers(|win, c| {
+            // SAFETY: `win` is a valid window of the list.
+            unsafe { (*win).flags & sys::NK_WINDOW_HIDDEN as u32 == 0 && (*win).seq == c.seq && (*win).buffer.last != (*win).buffer.begin }
+        });
+        self.frame_built = true;
+    }
+
     /// End the frame. Call this method after all windows of the frame.
     pub fn clear(&mut self) {
+        // The flag stays set when `commands` did not run in the frame, because only `nk_build` resets it. `nk_clear` does not reset it.
+        self.drop_popup_buffers(|_, _| false);
         // SAFETY: the context is valid.
         unsafe { sys::nk_clear(self.raw()) };
         self.ratios.clear();

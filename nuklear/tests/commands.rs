@@ -35,3 +35,47 @@ use nuklear::*;
     assert!(ctx.window("w", bounds, PanelFlags::BORDER, |_| ()).is_some());
     ctx.clear();
 }
+
+const BOUNDS: Rect = Rect { x: 0.0, y: 0.0, w: 200.0, h: 200.0 };
+
+fn draw(ctx: &mut Context<'_>, name: &str, labels: usize) -> Option<()> {
+    ctx.window(name, BOUNDS, PanelFlags::BORDER, |w| {
+        w.layout_row_dynamic(30.0, 1);
+        (0..labels).for_each(|_| w.label("x", TextAlign::LEFT));
+    })
+}
+
+/// The commands of a frame that draws only the window "b".
+fn walk_of_b_alone() -> Vec<String> {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    draw(&mut ctx, "b", 4);
+    ctx.commands().map(|c| format!("{c:?}")).collect()
+}
+
+#[test] fn window_hidden_at_begin_then_shown_draws_nothing() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    draw(&mut ctx, "a", 2);
+    ctx.clear();
+    ctx.window_show("a", ShowState::Hidden);
+    assert!(draw(&mut ctx, "a", 2).is_none());
+    draw(&mut ctx, "b", 4);
+    ctx.window_show("a", ShowState::Shown);
+    let walk: Vec<String> = ctx.commands().map(|c| format!("{c:?}")).collect();
+    assert_eq!(walk, walk_of_b_alone());
+    ctx.clear();
+}
+#[test] fn window_closed_at_begin_then_shown_draws_nothing() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    draw(&mut ctx, "a", 2);
+    ctx.clear();
+    ctx.window_close("a");
+    assert!(draw(&mut ctx, "a", 2).is_none());
+    draw(&mut ctx, "b", 4);
+    ctx.window_show("a", ShowState::Shown);
+    let walk: Vec<String> = ctx.commands().map(|c| format!("{c:?}")).collect();
+    assert_eq!(walk, walk_of_b_alone());
+    ctx.clear();
+}
