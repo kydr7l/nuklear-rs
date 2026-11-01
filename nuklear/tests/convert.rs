@@ -101,3 +101,31 @@ fn layout() -> VertexLayout {
     assert!(verts.as_bytes().len() >= 1000);
     ctx.clear();
 }
+/// A font with zero text width, so Nuklear never shortens a label to the widget width.
+struct ZeroFont;
+impl Font for ZeroFont {
+    fn height(&self) -> f32 { 12.0 }
+    fn width(&self, _h: f32, _t: &str) -> f32 { 0.0 }
+    fn glyph(&self, _h: f32, _c: char, _n: char) -> Glyph { Glyph { height: 12.0, ..Default::default() } }
+    fn texture(&self) -> Handle { Handle::id(1) }
+}
+// This test runs the grow path of the context command memory with unaligned text commands near power-of-two sizes.
+// It cannot detect an overrun without a heap checker.
+#[test] fn long_labels_grow_the_command_memory() {
+    let font = UserFont::new(ZeroFont);
+    let mut ctx = Context::new(&font).unwrap();
+    let layout = layout();
+    let cfg = ConvertConfig::new(&layout, NullTexture { texture: Handle::id(1), uv: Vec2::default() });
+    let (mut cmds, mut verts, mut elems) = (Buffer::new(), Buffer::new(), Buffer::new());
+    let lengths = (3970..4110).chain((8060..8200).step_by(3)).chain((16260..16400).step_by(7)).chain([20_000]);
+    for n in lengths {
+        let text = "x".repeat(n);
+        ctx.window("w", Rect { x: 0.0, y: 0.0, w: 200.0, h: 200.0 }, PanelFlags::BORDER, |w| { w.layout_row_dynamic(30.0, 1); w.label(&text, TextAlign::LEFT); });
+        assert!(ctx.commands().any(|c| matches!(c, Command::Text { ref text, .. } if text.len() == n)));
+        // Each glyph makes 4 vertices, and the 16-bit index limit is 65535 vertices.
+        if n < 12_000 {
+            assert!(ctx.convert(&mut cmds, &mut verts, &mut elems, &cfg).unwrap().count() > 0);
+        }
+        ctx.clear();
+    }
+}

@@ -16,10 +16,11 @@ const MAX_VERTEX: usize = 1024;
 /// The largest segment count that `Context::convert` accepts. A 16-bit index cannot address more vertices.
 const MAX_SEGMENTS: u32 = u16::MAX as u32;
 
-/// The allocation callback of every `Buffer`.
+/// The allocation callback of every `Buffer` and of the context memory.
 ///
 /// `nk_buffer_alloc` grows a buffer without the alignment padding, so an aligned write can go up to
-/// `vertex_alignment - 1` bytes past the end. Each block has `MAX_VERTEX` extra bytes to hold that write.
+/// `align - 1` bytes past the end. The largest `align` is `MAX_VERTEX` (vertices); commands and indices use less.
+/// Each block has `MAX_VERTEX` extra bytes to hold that write.
 /// `nk_buffer_realloc` copies the old block itself, so this function ignores `_old` and always allocates a new block.
 unsafe extern "C" fn buffer_alloc(_: sys::nk_handle, _old: *mut c_void, size: sys::nk_size) -> *mut c_void {
     match size.checked_add(MAX_VERTEX) {
@@ -29,10 +30,16 @@ unsafe extern "C" fn buffer_alloc(_: sys::nk_handle, _old: *mut c_void, size: sy
     }
 }
 
-/// The free callback of every `Buffer`.
+/// The free callback of `slack_allocator`.
 unsafe extern "C" fn buffer_free(_: sys::nk_handle, p: *mut c_void) {
     // SAFETY: Nuklear gives only pointers that `buffer_alloc` returned, and each pointer only once. They come from calloc.
     unsafe { free(p) }
+}
+
+/// Get the allocator for every Nuklear buffer of this crate: calloc with `MAX_VERTEX` extra bytes per block.
+/// Nuklear copies the allocator, so a temporary value is enough.
+pub(crate) fn slack_allocator() -> sys::nk_allocator {
+    sys::nk_allocator { userdata: sys::nk_handle::default(), alloc: Some(buffer_alloc), free: Some(buffer_free) }
 }
 
 /// A growable Nuklear memory buffer. `Context::convert` fills it with draw commands, vertices or indices.
@@ -47,10 +54,9 @@ impl Buffer {
     /// Make an empty buffer with 4096 bytes of memory.
     pub fn new() -> Buffer {
         let p = Box::into_raw(Box::<sys::nk_buffer>::default());
-        let alloc = sys::nk_allocator { userdata: sys::nk_handle::default(), alloc: Some(buffer_alloc), free: Some(buffer_free) };
         // SAFETY: `p` comes from `Box::into_raw`, and no other reference to it exists. `nk_buffer_init` copies the allocator.
         let ptr = unsafe {
-            sys::nk_buffer_init(p, &alloc, 4096);
+            sys::nk_buffer_init(p, &slack_allocator(), 4096);
             (*p).memory.ptr
         };
         // With a null block, Nuklear would write through a null pointer, because the size is already set.

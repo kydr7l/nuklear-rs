@@ -63,12 +63,15 @@ pub struct Context<'f> {
 }
 
 impl<'f> Context<'f> {
-    /// Make a context that uses `font`. The function returns `None` when Nuklear cannot start.
+    /// Make a context that uses `font`. The function returns `None` when Nuklear cannot start or cannot get memory.
     pub fn new<F: FontHandle>(font: &'f F) -> Option<Context<'f>> {
         let p = Box::into_raw(Box::<sys::nk_context>::default());
         // SAFETY: `p` comes from `Box::into_raw`. The font pointer stays valid for `'f`, and `'f` outlives the context.
-        let ok = unsafe { sys::nk_init_default(p, font.raw()) };
-        if !ok {
+        // `nk_init` copies the allocator. Its slack bytes hold the aligned command writes that the grow path of `nk_buffer_alloc` can put past a block.
+        // After `nk_init`, the command memory is allocated or null. The page pool allocates nothing yet.
+        let (ok, mem) = unsafe { (sys::nk_init(p, &crate::convert::slack_allocator(), font.raw()), (*p).memory.memory.ptr) };
+        // With a null block, Nuklear would write through a null pointer, because the size is already set. Nothing else needs a free.
+        if !ok || mem.is_null() {
             // SAFETY: `p` comes from `Box::into_raw`, and no other owner exists.
             drop(unsafe { Box::from_raw(p) });
             return None;
