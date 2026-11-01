@@ -1,0 +1,8 @@
+[package]
+name = "nuklear"
+version = "0.1.0"
+edition = "2021"
+description = "Safe Rust wrapper for the Nuklear immediate mode GUI library."
+
+[dependencies]
+nuklear-sys = { path = "../nuklear-sys", version = "0.1.0" }
