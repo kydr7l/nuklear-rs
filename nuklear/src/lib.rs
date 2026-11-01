@@ -10,8 +10,13 @@ pub use types::*;
 pub mod font;
 pub use font::*;
 
+pub mod context;
+pub use context::*;
+
+pub mod window;
+pub use window::*;
+
 /// Make a C string from `s`. The function stops at the first NUL byte.
-#[allow(dead_code)] // Later tasks call this function.
 pub(crate) fn cstr(s: &str) -> std::ffi::CString {
     let end = s.find('\0').unwrap_or(s.len());
     std::ffi::CString::new(&s.as_bytes()[..end]).unwrap_or_default()
