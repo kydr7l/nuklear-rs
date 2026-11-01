@@ -1,0 +1,270 @@
+//! Basic widgets of the window scope.
+//!
+//! Every text method passes the pointer and the length of the Rust string to a Nuklear `_text` function.
+//! None of these functions reads the string up to a NUL byte.
+
+use crate::{cstr, sys, text_arg, ButtonBehavior, ChartType, Color, ColorFormat, Colorf, Heading, Image, Symbol, TextAlign, Window};
+
+impl<'a, 'f> Window<'a, 'f> {
+    /// Show a text label.
+    pub fn label(&mut self, text: &str, align: TextAlign) {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
+        unsafe { sys::nk_text(self.raw(), ptr, len, align.bits()) }
+    }
+
+    /// Show a text label with a color.
+    pub fn label_colored(&mut self, text: &str, align: TextAlign, color: Color) {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
+        unsafe { sys::nk_text_colored(self.raw(), ptr, len, align.bits(), color.into()) }
+    }
+
+    /// Show a text label that wraps at the end of the line.
+    pub fn label_wrap(&mut self, text: &str) {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
+        unsafe { sys::nk_text_wrap(self.raw(), ptr, len) }
+    }
+
+    /// Show a text label with a color that wraps at the end of the line.
+    pub fn label_wrap_colored(&mut self, text: &str, color: Color) {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
+        unsafe { sys::nk_text_wrap_colored(self.raw(), ptr, len, color.into()) }
+    }
+
+    /// Show an image.
+    pub fn image(&mut self, img: Image) {
+        // SAFETY: the context is valid, and a window is open.
+        unsafe { sys::nk_image(self.raw(), sys::nk_image::from(img)) }
+    }
+
+    /// Show an image with a color.
+    pub fn image_color(&mut self, img: Image, color: Color) {
+        // SAFETY: the context is valid, and a window is open.
+        unsafe { sys::nk_image_color(self.raw(), sys::nk_image::from(img), color.into()) }
+    }
+
+    /// Show a button with a text. The method returns `true` when the user clicks the button.
+    pub fn button_label(&mut self, text: &str) -> bool {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
+        unsafe { sys::nk_button_text(self.raw(), ptr, len) }
+    }
+
+    /// Show a button with a color. The method returns `true` when the user clicks the button.
+    pub fn button_color(&mut self, color: Color) -> bool {
+        // SAFETY: the context is valid, and a window is open.
+        unsafe { sys::nk_button_color(self.raw(), color.into()) }
+    }
+
+    /// Show a button with a symbol. The method returns `true` when the user clicks the button.
+    pub fn button_symbol(&mut self, symbol: Symbol) -> bool {
+        // SAFETY: the context is valid, and a window is open.
+        unsafe { sys::nk_button_symbol(self.raw(), symbol.raw() as _) }
+    }
+
+    /// Show a button with an image. The method returns `true` when the user clicks the button.
+    pub fn button_image(&mut self, img: Image) -> bool {
+        // SAFETY: the context is valid, and a window is open.
+        unsafe { sys::nk_button_image(self.raw(), sys::nk_image::from(img)) }
+    }
+
+    /// Show a button with a symbol and a text. The method returns `true` when the user clicks the button.
+    pub fn button_symbol_label(&mut self, symbol: Symbol, text: &str, align: TextAlign) -> bool {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
+        unsafe { sys::nk_button_symbol_text(self.raw(), symbol.raw() as _, ptr, len, align.bits()) }
+    }
+
+    /// Show a button with an image and a text. The method returns `true` when the user clicks the button.
+    pub fn button_image_label(&mut self, img: Image, text: &str, align: TextAlign) -> bool {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
+        unsafe { sys::nk_button_image_text(self.raw(), sys::nk_image::from(img), ptr, len, align.bits()) }
+    }
+
+    /// Set the behavior of the buttons that follow.
+    pub fn button_set_behavior(&mut self, behavior: ButtonBehavior) {
+        // SAFETY: the context is valid, and `behavior` is a valid value.
+        unsafe { sys::nk_button_set_behavior(self.raw(), behavior.raw() as _) }
+    }
+
+    /// Show a checkbox. The method returns `true` when the user changed `active`.
+    pub fn checkbox(&mut self, text: &str, active: &mut bool) -> bool {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `active` is writable.
+        unsafe { sys::nk_checkbox_text(self.raw(), ptr, len, active) }
+    }
+
+    /// Show a checkbox that sets or clears the bits `value` in `flags`. The method returns `true` when the user changed `flags`.
+    pub fn checkbox_flags(&mut self, text: &str, flags: &mut u32, value: u32) -> bool {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `flags` is writable.
+        unsafe { sys::nk_checkbox_flags_text(self.raw(), ptr, len, flags, value) }
+    }
+
+    /// Show a radio button. The method returns `true` when the user changed `active`.
+    pub fn radio(&mut self, text: &str, active: &mut bool) -> bool {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `active` is writable.
+        unsafe { sys::nk_radio_text(self.raw(), ptr, len, active) }
+    }
+
+    /// Show an option button. The method returns the state of the button: `true` when it is active.
+    /// Nuklear does not report a change. Compare the result with `active` to find one.
+    pub fn option(&mut self, text: &str, active: bool) -> bool {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
+        unsafe { sys::nk_option_text(self.raw(), ptr, len, active) }
+    }
+
+    /// Show a selectable text. The method returns `true` when the user changed `value`.
+    pub fn selectable(&mut self, text: &str, align: TextAlign, value: &mut bool) -> bool {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `value` is writable.
+        unsafe { sys::nk_selectable_text(self.raw(), ptr, len, align.bits(), value) }
+    }
+
+    /// Show a selectable text with an image. The method returns `true` when the user changed `value`.
+    pub fn selectable_image(&mut self, img: Image, text: &str, align: TextAlign, value: &mut bool) -> bool {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `value` is writable.
+        unsafe { sys::nk_selectable_image_text(self.raw(), sys::nk_image::from(img), ptr, len, align.bits(), value) }
+    }
+
+    /// Show a selectable text with a symbol. The method returns `true` when the user changed `value`.
+    pub fn selectable_symbol(&mut self, symbol: Symbol, text: &str, align: TextAlign, value: &mut bool) -> bool {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `value` is writable.
+        unsafe { sys::nk_selectable_symbol_text(self.raw(), symbol.raw() as _, ptr, len, align.bits(), value) }
+    }
+
+    /// Show a slider. The method returns `true` when the user changed `value`.
+    /// The method does nothing and returns `false` when `step <= 0`, `min >= max`, or a number is not finite.
+    pub fn slider_f32(&mut self, min: f32, value: &mut f32, max: f32, step: f32) -> bool {
+        if step <= 0.0 || min >= max || ![min, *value, max, step].iter().all(|v| v.is_finite()) {
+            return false;
+        }
+        // SAFETY: the context is valid, a window is open, and `value` is writable.
+        unsafe { sys::nk_slider_float(self.raw(), min, value, max, step) }
+    }
+
+    /// Show a slider. The method returns `true` when the user changed `value`.
+    /// The method does nothing and returns `false` when `step <= 0` or `min >= max`.
+    pub fn slider_i32(&mut self, min: i32, value: &mut i32, max: i32, step: i32) -> bool {
+        if step <= 0 || min >= max {
+            return false;
+        }
+        // SAFETY: the context is valid, a window is open, and `value` is writable.
+        unsafe { sys::nk_slider_int(self.raw(), min, value, max, step) }
+    }
+
+    /// Show a knob. The method returns `true` when the user changed `value`.
+    /// The method does nothing and returns `false` when `step <= 0`, `min >= max`, or a number is not finite.
+    pub fn knob_f32(&mut self, min: f32, value: &mut f32, max: f32, step: f32, zero: Heading, dead_zone_degrees: f32) -> bool {
+        if step <= 0.0 || min >= max || ![min, *value, max, step, dead_zone_degrees].iter().all(|v| v.is_finite()) {
+            return false;
+        }
+        // SAFETY: the context is valid, a window is open, and `value` is writable.
+        unsafe { sys::nk_knob_float(self.raw(), min, value, max, step, zero.raw() as _, dead_zone_degrees) }
+    }
+
+    /// Show a knob. The method returns `true` when the user changed `value`.
+    /// The method does nothing and returns `false` when `step <= 0`, `min >= max`, or `dead_zone_degrees` is not finite.
+    pub fn knob_i32(&mut self, min: i32, value: &mut i32, max: i32, step: i32, zero: Heading, dead_zone_degrees: f32) -> bool {
+        if step <= 0 || min >= max || !dead_zone_degrees.is_finite() {
+            return false;
+        }
+        // SAFETY: the context is valid, a window is open, and `value` is writable.
+        unsafe { sys::nk_knob_int(self.raw(), min, value, max, step, zero.raw() as _, dead_zone_degrees) }
+    }
+
+    /// Show a progress bar. The method returns `true` when the user changed `current`.
+    /// The method does nothing and returns `false` when `max` is 0.
+    pub fn progress(&mut self, current: &mut usize, max: usize, modifiable: bool) -> bool {
+        if max == 0 {
+            return false;
+        }
+        // SAFETY: the context is valid, a window is open, and `current` is writable.
+        unsafe { sys::nk_progress(self.raw(), current, max, modifiable) }
+    }
+
+    /// Show a color picker. The method returns `true` when the user changed `color`.
+    pub fn color_pick(&mut self, color: &mut Colorf, format: ColorFormat) -> bool {
+        let mut c = sys::nk_colorf::from(*color);
+        // SAFETY: the context is valid, a window is open, and `c` is writable.
+        let changed = unsafe { sys::nk_color_pick(self.raw(), &mut c, format.raw() as _) };
+        *color = c.into();
+        changed
+    }
+
+    /// Show an integer property. The method returns `true` when the user changed `value`.
+    /// The method does nothing and returns `false` when `min > max` or `inc_per_pixel` is not finite.
+    pub fn property_i32(&mut self, name: &str, min: i32, value: &mut i32, max: i32, step: i32, inc_per_pixel: f32) -> bool {
+        if min > max || !inc_per_pixel.is_finite() {
+            return false;
+        }
+        let name = cstr(name);
+        // SAFETY: the context is valid, a window is open, `name` ends with NUL, and `value` is writable.
+        unsafe { sys::nk_property_int(self.raw(), name.as_ptr(), min, value, max, step, inc_per_pixel) }
+    }
+
+    /// Show a `f32` property. The method returns `true` when the user changed `value`.
+    /// The method does nothing and returns `false` when `min > max`, or a number is not finite.
+    pub fn property_f32(&mut self, name: &str, min: f32, value: &mut f32, max: f32, step: f32, inc_per_pixel: f32) -> bool {
+        if min > max || ![min, *value, max, step, inc_per_pixel].iter().all(|v| v.is_finite()) {
+            return false;
+        }
+        let name = cstr(name);
+        // SAFETY: the context is valid, a window is open, `name` ends with NUL, and `value` is writable.
+        unsafe { sys::nk_property_float(self.raw(), name.as_ptr(), min, value, max, step, inc_per_pixel) }
+    }
+
+    /// Show a `f64` property. The method returns `true` when the user changed `value`.
+    /// The method does nothing and returns `false` when `min > max`, or a number is not finite.
+    pub fn property_f64(&mut self, name: &str, min: f64, value: &mut f64, max: f64, step: f64, inc_per_pixel: f32) -> bool {
+        if min > max || ![min, *value, max, step].iter().all(|v| v.is_finite()) || !inc_per_pixel.is_finite() {
+            return false;
+        }
+        let name = cstr(name);
+        // SAFETY: the context is valid, a window is open, `name` ends with NUL, and `value` is writable.
+        unsafe { sys::nk_property_double(self.raw(), name.as_ptr(), min, value, max, step, inc_per_pixel) }
+    }
+
+    /// Show a chart of `values` from the index `offset`. The method does nothing when no value is left
+    /// or a value is not finite.
+    pub fn plot(&mut self, ty: ChartType, values: &[f32], offset: usize) {
+        let values = values.get(offset..).unwrap_or_default();
+        let count = values.len().min(i32::MAX as usize);
+        if count == 0 || !values[..count].iter().all(|v| v.is_finite()) {
+            return;
+        }
+        // SAFETY: the context is valid, a window is open, and `values` holds `count` floats. The C offset is 0.
+        unsafe { sys::nk_plot(self.raw(), ty.raw() as _, values.as_ptr(), count as i32, 0) }
+    }
+
+    /// Show a tooltip with `text`. The method does nothing inside a popup.
+    pub fn tooltip(&mut self, text: &str) {
+        if self.ctx.popup_depth > 0 {
+            return;
+        }
+        let text = cstr(text);
+        let ctx = self.raw();
+        // SAFETY: a `Window` exists only inside a window body. There `current` and its `layout` are not null.
+        let (win, layout) = unsafe { ((*ctx).current, (*(*ctx).current).layout) };
+        // SAFETY: `win` and `layout` are valid, see above.
+        let (layout_type, popup_type) = unsafe { ((*layout).type_, (*win).popup.type_) };
+        // SAFETY: the context is valid, a window is open, and `text` ends with NUL.
+        unsafe { sys::nk_tooltip(ctx, text.as_ptr()) };
+        // SAFETY: the window and its panel still exist after the call.
+        unsafe {
+            // When the tooltip popup fails to open, Nuklear writes the tooltip type into the parent panel. Restore the old types.
+            if (*layout).type_ != layout_type {
+                (*layout).type_ = layout_type;
+                (*win).popup.type_ = popup_type;
+            }
+        }
+    }
+}

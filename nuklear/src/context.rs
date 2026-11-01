@@ -8,7 +8,6 @@ use std::ptr::NonNull;
 pub const COLOR_COUNT: usize = sys::NK_COLOR_COUNT as usize;
 
 /// The kind of the current layout row.
-#[allow(dead_code)] // Task 5 uses the other variants.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum RowKind {
     #[default]
@@ -19,11 +18,14 @@ pub(crate) enum RowKind {
 }
 
 /// The layout state of the current panel.
-#[allow(dead_code)] // Task 5 reads these fields.
 #[derive(Clone, Copy, Default)]
 pub(crate) struct PanelState {
+    /// The kind of row that the last layout call started.
     pub row_kind: RowKind,
+    /// The number of columns pushed to the current row template.
     pub template_cols: u8,
+    /// This flag is `true` after the first layout call. The menubar checks it.
+    #[allow(dead_code)] // The menubar reads this field.
     pub layout_started: bool,
 }
 
@@ -51,9 +53,11 @@ pub(crate) struct PanelState {
 pub struct Context<'f> {
     /// This pointer comes from `Box::into_raw`. Nuklear stores pointers into the allocation, so it must not move.
     raw: NonNull<sys::nk_context>,
-    #[allow(dead_code)] // Task 7 reads this field.
+    /// The number of open popups. A tooltip does nothing inside a popup.
     pub(crate) popup_depth: u32,
     pub(crate) panel: PanelState,
+    /// Ratio arrays for `layout_row`. Nuklear keeps a pointer into each array until the window ends.
+    pub(crate) ratios: Vec<Box<[f32]>>,
     _font: PhantomData<&'f sys::nk_user_font>,
 }
 
@@ -73,6 +77,7 @@ impl<'f> Context<'f> {
             raw: unsafe { NonNull::new_unchecked(p) },
             popup_depth: 0,
             panel: PanelState::default(),
+            ratios: Vec::new(),
             _font: PhantomData,
         })
     }
@@ -151,13 +156,16 @@ impl<'f> Context<'f> {
         let r = open.then(|| self.panel_scope(|ctx| f(&mut Window { ctx })));
         // SAFETY: the context is valid. Every `nk_begin_titled` call needs one `nk_end` call, whatever it returned.
         unsafe { sys::nk_end(self.raw()) };
+        // After `nk_end` the panel is gone, so Nuklear holds no pointer into the ratio arrays.
+        self.ratios.clear();
         r
     }
 
     /// End the frame. Call this method after all windows of the frame.
     pub fn clear(&mut self) {
         // SAFETY: the context is valid.
-        unsafe { sys::nk_clear(self.raw()) }
+        unsafe { sys::nk_clear(self.raw()) };
+        self.ratios.clear();
     }
 
     /// Check if the window `name` is closed. The method returns `true` when the window does not exist.
