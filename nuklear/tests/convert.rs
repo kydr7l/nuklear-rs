@@ -129,3 +129,39 @@ impl Font for ZeroFont {
         ctx.clear();
     }
 }
+// The Buffer memory starts zeroed. Nuklear must not write the 4 bytes after the color of any vertex.
+// Anti-aliasing is off, because the AA paths keep temporary normals in the free vertex memory, and later vertices keep those bytes in their padding.
+#[test] fn color_formats_write_only_inside_the_vertex() {
+    use VertexFormat::*;
+    let formats = [R8G8B8, R16G15B16, R32G32B32, R8G8B8A8, B8G8R8A8, R16G15B16A16, R32G32B32A32, R32G32B32A32Float, R32G32B32A32Double, Rgb32, Rgba32];
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    for fmt in formats {
+        let size = 8 + fmt.size() + 4;
+        let layout = VertexLayout::new(size, 4, &[(VertexAttribute::Position, Float, 0), (VertexAttribute::Color, fmt, 8)]).unwrap();
+        let mut cfg = ConvertConfig::new(&layout, NullTexture { texture: Handle::id(1), uv: Vec2::default() });
+        (cfg.line_aa, cfg.shape_aa) = (AntiAliasing::Off, AntiAliasing::Off);
+        ctx.window("w", Rect { x: 0.0, y: 0.0, w: 200.0, h: 200.0 }, PanelFlags::TITLE | PanelFlags::BORDER, |w| { w.layout_row_dynamic(30.0, 1); w.label("hello", TextAlign::LEFT); });
+        let (mut cmds, mut verts, mut elems) = (Buffer::new(), Buffer::new(), Buffer::new());
+        assert!(ctx.convert(&mut cmds, &mut verts, &mut elems, &cfg).unwrap().count() > 0, "{fmt:?}");
+        let bytes = verts.as_bytes();
+        assert!(!bytes.is_empty() && bytes.len() % size == 0, "{fmt:?}");
+        for (i, v) in bytes.chunks_exact(size).enumerate() {
+            assert_eq!(v[size - 4..], [0; 4], "{fmt:?}, vertex {i}");
+        }
+        ctx.clear();
+    }
+}
+#[test] fn image_with_a_pointer_handle_converts() {
+    let mut texel = 0u8;
+    let tex = Handle::ptr((&mut texel as *mut u8).cast());
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    ctx.window("w", Rect { x: 0.0, y: 0.0, w: 200.0, h: 200.0 }, PanelFlags::BORDER, |w| { w.layout_row_dynamic(30.0, 1); w.image(Image::new(tex, 8, 8)); });
+    let layout = layout();
+    let cfg = ConvertConfig::new(&layout, NullTexture { texture: Handle::id(1), uv: Vec2::default() });
+    let (mut cmds, mut verts, mut elems) = (Buffer::new(), Buffer::new(), Buffer::new());
+    let textures: Vec<_> = ctx.convert(&mut cmds, &mut verts, &mut elems, &cfg).unwrap().map(|d| d.texture.as_ptr()).collect();
+    assert!(textures.contains(&tex.as_ptr()), "{textures:?}");
+    ctx.clear();
+}

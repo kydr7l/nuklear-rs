@@ -49,12 +49,32 @@ use nuklear::*;
     // SAFETY: the empty check fails first, so Nuklear never reads the bytes.
     assert!(unsafe { b.add_ttf(&[], 13.0) }.is_none());
 }
-#[test] fn ttf_from_the_system_bakes() {
-    let Ok(ttf) = std::fs::read("C:/Windows/Fonts/arial.ttf") else { return };
+#[test]
+#[cfg_attr(not(windows), ignore = "needs C:/Windows/Fonts/arial.ttf")]
+fn ttf_from_the_system_bakes() {
+    let ttf = std::fs::read("C:/Windows/Fonts/arial.ttf").expect("C:/Windows/Fonts/arial.ttf ships with Windows");
     let mut b = FontAtlasBuilder::new();
     // SAFETY: the file is a well-formed TrueType font that ships with Windows.
     let id = unsafe { b.add_ttf(&ttf, 16.0) }.unwrap();
     drop(ttf); // The atlas copies the bytes.
     let (atlas, _) = b.bake(AtlasFormat::Alpha8).unwrap().end(Handle::id(1));
     assert_eq!(atlas.font(id).unwrap().height(), 16.0);
+}
+// The atlas code uses C globals. The crate holds a mutex around them, so atlas builds on many threads must not race.
+#[test] fn atlas_builds_on_many_threads() {
+    let threads: Vec<_> = (0..8)
+        .map(|_| {
+            std::thread::spawn(|| {
+                for _ in 0..20 {
+                    let mut b = FontAtlasBuilder::new();
+                    let id = b.add_default(13.0).unwrap();
+                    let (atlas, _) = b.bake(AtlasFormat::Alpha8).unwrap().end(Handle::id(1));
+                    assert_eq!(atlas.font(id).unwrap().height(), 13.0);
+                }
+            })
+        })
+        .collect();
+    for t in threads {
+        t.join().unwrap();
+    }
 }
