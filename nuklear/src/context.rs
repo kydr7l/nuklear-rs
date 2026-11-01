@@ -98,9 +98,10 @@ impl<'f> Context<'f> {
     }
 
     /// Run `f` with a clean panel state. The function restores the old state after `f`.
+    /// A panic in `f` aborts the process, because the C end call of the panel cannot be skipped.
     pub(crate) fn panel_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         let saved = std::mem::take(&mut self.panel);
-        let r = f(self);
+        let r = crate::no_unwind(|| f(self));
         self.panel = saved;
         r
     }
@@ -125,10 +126,11 @@ impl<'f> Context<'f> {
     }
 
     /// Send input events to the context. Call this method once for each frame, before any window.
+    /// A panic in `f` aborts the process.
     pub fn input<R>(&mut self, f: impl FnOnce(&mut Input<'_, 'f>) -> R) -> R {
         // SAFETY: the context is valid.
         unsafe { sys::nk_input_begin(self.raw()) };
-        let r = f(&mut Input(self));
+        let r = crate::no_unwind(|| f(&mut Input(self)));
         // SAFETY: the context is valid.
         unsafe { sys::nk_input_end(self.raw()) };
         r
@@ -145,7 +147,7 @@ impl<'f> Context<'f> {
         self.window_titled(title, title, bounds, flags, f)
     }
 
-    /// Make a window. The function runs `f` only when the window is open and visible.
+    /// Make a window. The function runs `f` only when the window is open and visible. A panic in `f` aborts the process.
     /// After `commands` and before `clear`, the function returns `None` and does not call Nuklear.
     /// The function returns the value of `f`, or `None` when it did not run `f`.
     pub fn window_titled<R>(
@@ -303,8 +305,7 @@ impl<'f> Context<'f> {
     /// Close the window `name`.
     pub fn window_close(&mut self, name: &str) {
         let name = cstr(name);
-        // SAFETY: the context is valid, and `name` ends with NUL. Normally no window is current, because `nk_end` always runs.
-        // After a caught panic in a window body, the stale current window can hit `NK_ASSERT(ctx->current != win)`. That aborts and is not UB.
+        // SAFETY: the context is valid, and `name` ends with NUL. No window is current, because `nk_end` always runs.
         unsafe { sys::nk_window_close(self.raw(), name.as_ptr()) }
     }
 

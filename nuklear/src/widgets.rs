@@ -18,6 +18,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a text label.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn label(&mut self, text: &str, align: TextAlign) {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
@@ -25,6 +26,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a text label with a color.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn label_colored(&mut self, text: &str, align: TextAlign, color: Color) {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
@@ -32,6 +34,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a text label that wraps at the end of the line.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn label_wrap(&mut self, text: &str) {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
@@ -39,6 +42,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a text label with a color that wraps at the end of the line.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn label_wrap_colored(&mut self, text: &str, color: Color) {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
@@ -58,6 +62,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a button with a text. The method returns `true` when the user clicks the button.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn button_label(&mut self, text: &str) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
@@ -83,6 +88,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a button with a symbol and a text. The method returns `true` when the user clicks the button.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn button_symbol_label(&mut self, symbol: Symbol, text: &str, align: TextAlign) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
@@ -90,6 +96,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a button with an image and a text. The method returns `true` when the user clicks the button.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn button_image_label(&mut self, img: Image, text: &str, align: TextAlign) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
@@ -103,6 +110,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a checkbox. The method returns `true` when the user changed `active`.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn checkbox(&mut self, text: &str, active: &mut bool) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `active` is writable.
@@ -110,6 +118,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a checkbox that sets or clears the bits `value` in `flags`. The method returns `true` when the user changed `flags`.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn checkbox_flags(&mut self, text: &str, flags: &mut u32, value: u32) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `flags` is writable.
@@ -117,6 +126,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a radio button. The method returns `true` when the user changed `active`.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn radio(&mut self, text: &str, active: &mut bool) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `active` is writable.
@@ -125,6 +135,7 @@ impl<'a, 'f> Window<'a, 'f> {
 
     /// Show an option button. The method returns the state of the button: `true` when it is active.
     /// Nuklear does not report a change. Compare the result with `active` to find one.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn option(&mut self, text: &str, active: bool) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
@@ -132,6 +143,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a selectable text. The method returns `true` when the user changed `value`.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn selectable(&mut self, text: &str, align: TextAlign, value: &mut bool) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `value` is writable.
@@ -139,6 +151,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a selectable text with an image. The method returns `true` when the user changed `value`.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn selectable_image(&mut self, img: Image, text: &str, align: TextAlign, value: &mut bool) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `value` is writable.
@@ -146,6 +159,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a selectable text with a symbol. The method returns `true` when the user changed `value`.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn selectable_symbol(&mut self, symbol: Symbol, text: &str, align: TextAlign, value: &mut bool) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `value` is writable.

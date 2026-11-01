@@ -35,6 +35,7 @@ cargo clippy --workspace --all-targets -- -D warnings && cargo doc --workspace -
 
 The goal is that no safe code causes undefined behaviour. The crate docs of `nuklear` describe the rules.
 Misuse that the wrapper does not model aborts the process with the failed Nuklear assertion printed to stderr.
+A panic in the body of a scope (a window, a group, a popup, a tree and the other closures) aborts the process. `catch_unwind` cannot catch it, because an unwind would skip the Nuklear end call and leave Nuklear with pointers into freed memory.
 The only `unsafe fn` is `FontAtlasBuilder::add_ttf`, because stb_truetype reads out of bounds on a malformed font file.
 
 ## Known limitations
@@ -49,6 +50,8 @@ The only `unsafe fn` is `FontAtlasBuilder::add_ttf`, because stb_truetype reads 
 - Segment counts above 65535 are rejected.
 - Two windows with the same name in one frame abort the process.
 - Nuklear assertions abort the process and print the expression.
+- A panic in a scope body aborts the process.
+- Text is cut at 2^30 bytes (1 GiB).
 
 ## Not included
 

@@ -305,11 +305,11 @@ impl Window<'_, '_> {
         unsafe { sys::nk_widget_has_mouse_click_down(self.ctx.raw_const(), button.raw() as _, down) }
     }
 
-    /// Run `f`. The widgets that `f` makes are disabled and do not react to input.
+    /// Run `f`. The widgets that `f` makes are disabled and do not react to input. A panic in `f` aborts the process.
     pub fn disabled<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         // SAFETY: the context is valid, and a window is open.
         unsafe { sys::nk_widget_disable_begin(self.raw()) };
-        let r = f(self);
+        let r = crate::no_unwind(|| f(self));
         // SAFETY: the context is valid, and a window is open.
         unsafe { sys::nk_widget_disable_end(self.raw()) };
         r

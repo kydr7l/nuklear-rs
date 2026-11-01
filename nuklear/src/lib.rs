@@ -54,9 +54,10 @@
 //! - **Fonts.** Nuklear keeps a pointer to the font. `Context<'f>` borrows the font for `'f`, so the font lives longer than the context.
 //!   `UserFont` boxes the `Font` value and passes a thin pointer to the C callbacks.
 //! - **Scopes.** Nuklear needs `_begin` and `_end` calls in pairs. Every scope is a closure, for example `Context::window`.
-//!   The `_end` call always runs. A widget method exists only on `Window`, so no widget call happens outside a window.
+//!   When the closure returns, the `_end` call runs. A panic in the closure aborts the process, so no unwind skips the `_end` call.
+//!   A widget method exists only on `Window`, so no widget call happens outside a window.
 //! - **Strings.** The wrapper uses the `_text` variants with a length whenever Nuklear has one. Other strings become C strings
-//!   that stop at the first NUL byte.
+//!   that stop at the first NUL byte. A `_text` variant gets at most the first 2^30 bytes of a string.
 //! - **Command memory.** `Context::commands` and `Context::convert` return iterators that borrow the context.
 //!   The commands cannot outlive the next `Context::clear`. `DrawCommands` borrows the same `Buffer` that `convert` filled.
 //! - **Vertex layout.** `VertexLayout::new` checks every element, so Nuklear writes only inside each vertex.
@@ -72,13 +73,15 @@
 //!
 //! # Aborts
 //!
-//! Two kinds of misuse abort the process. The abort never corrupts memory.
+//! These events abort the process. The process stops before Nuklear uses memory that is not valid.
 //!
 //! - Two windows with the same name in one frame fail a Nuklear assertion.
 //! - Every Nuklear assertion calls `nk_rs_assert_fail`. This function prints the expression, the file and the line to stderr, and it aborts.
-//!   Assertions stay on in every build profile.
-//!
-//! A panic inside a `Font` method also aborts, because the panic cannot unwind through the C code.
+//!   Assertions stay on in every build profile. The stb_truetype and stb_rect_pack assertions use the same function.
+//! - A panic in the body of a scope aborts the process. The scopes are `Context::input`, `Context::window`, and every
+//!   `Window` method that takes a closure. `std::panic::catch_unwind` cannot catch this panic.
+//!   After an unwind, Nuklear would keep pointers into freed Rust memory, for example the scroll offset of `Window::group_scrolled`.
+//! - A panic inside a `Font` method aborts, because the panic cannot unwind through the C code.
 //!
 //! # The unsafe function
 //!
@@ -102,6 +105,8 @@
 //! - `Context::convert` rejects a segment count above 65535.
 //! - Two windows with the same name in one frame abort the process.
 //! - A Nuklear assertion aborts the process and prints the expression.
+//! - A panic in a scope body aborts the process.
+//! - The `_text` functions get at most the first 2^30 bytes of a string. The cut can split a UTF-8 character.
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![deny(missing_docs)]
 
@@ -139,11 +144,54 @@ pub(crate) fn cstr(s: &str) -> std::ffi::CString {
     std::ffi::CString::new(&s.as_bytes()[..end]).unwrap_or_default()
 }
 
-/// Get the pointer and the length of `s` for a Nuklear `_text` function. The length is at most `i32::MAX`.
+/// The most bytes of a string that the wrapper gives to Nuklear.
+/// `nk_draw_text` adds `length + 1` in `int`, and `nk_buffer_alloc` rounds the size up in 32 bits. Both overflow above 2^31 bytes.
+const TEXT_LIMIT: usize = 1 << 30;
+
+/// Get the C length of a string of `len` bytes. The length is at most `TEXT_LIMIT`.
+fn text_len(len: usize) -> std::ffi::c_int {
+    len.min(TEXT_LIMIT) as std::ffi::c_int
+}
+
+/// Get the pointer and the length of `s` for a Nuklear `_text` function. The length is at most `TEXT_LIMIT`.
 /// An empty string gets a pointer to a static empty C string.
 pub(crate) fn text_arg(s: &str) -> (*const std::ffi::c_char, std::ffi::c_int) {
     if s.is_empty() {
         return (c"".as_ptr(), 0);
     }
-    (s.as_ptr().cast(), s.len().min(i32::MAX as usize) as std::ffi::c_int)
+    (s.as_ptr().cast(), text_len(s.len()))
+}
+
+/// A guard that aborts the process when a panic unwinds through it.
+///
+/// Between a C begin call and its end call, Nuklear holds pointers into Rust memory. An unwind would skip the end call.
+/// Then Nuklear keeps the pointers into freed memory, so an abort is the only sound result.
+pub(crate) struct AbortOnUnwind;
+
+impl Drop for AbortOnUnwind {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            std::process::abort();
+        }
+    }
+}
+
+/// Run `f`, the body of a C scope. A panic in `f` aborts the process.
+pub(crate) fn no_unwind<R>(f: impl FnOnce() -> R) -> R {
+    let guard = AbortOnUnwind;
+    let r = f();
+    // The body returned, so the guard has nothing to do. A guard made during an unwind must not abort after a normal return.
+    std::mem::forget(guard);
+    r
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn text_len_stops_at_the_limit() {
+        assert_eq!(super::text_len(5), 5);
+        assert_eq!(super::text_len(super::TEXT_LIMIT), 1 << 30);
+        assert_eq!(super::text_len(i32::MAX as usize), 1 << 30);
+        assert_eq!(super::text_len(usize::MAX), 1 << 30);
+    }
 }

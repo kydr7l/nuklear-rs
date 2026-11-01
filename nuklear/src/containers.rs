@@ -2,7 +2,7 @@
 //!
 //! Each container method calls the Nuklear begin function, runs the body when the container is open,
 //! and calls the matching end function. Nuklear asserts that popups do not contain popups,
-//! so the popup methods return `None` inside a popup.
+//! so the popup methods return `None` inside a popup. A panic in a body aborts the process, because the end call cannot be skipped.
 
 use crate::context::RowKind;
 use crate::{
@@ -62,6 +62,7 @@ macro_rules! items {
     ($name:ident, $text:ident, $image:ident, $symbol:ident) => {
         impl $name<'_, '_> {
             /// Show an item with a text.
+            /// The method uses only the first 2^30 bytes of the text.
             pub fn item_label(&mut self, text: &str, align: TextAlign) -> bool {
                 let (ptr, len) = text_arg(text);
                 // SAFETY: the context is valid, the popup is open, and `ptr` points to `len` readable bytes.
@@ -69,6 +70,7 @@ macro_rules! items {
             }
 
             /// Show an item with an image and a text.
+            /// The method uses only the first 2^30 bytes of the text.
             pub fn item_image_label(&mut self, img: Image, text: &str, align: TextAlign) -> bool {
                 let (ptr, len) = text_arg(text);
                 // SAFETY: the context is valid, the popup is open, and `ptr` points to `len` readable bytes.
@@ -76,6 +78,7 @@ macro_rules! items {
             }
 
             /// Show an item with a symbol and a text.
+            /// The method uses only the first 2^30 bytes of the text.
             pub fn item_symbol_label(&mut self, symbol: Symbol, text: &str, align: TextAlign) -> bool {
                 let (ptr, len) = text_arg(text);
                 // SAFETY: the context is valid, the popup is open, and `ptr` points to `len` readable bytes.
@@ -177,7 +180,7 @@ impl<'a, 'f> Window<'a, 'f> {
     /// Run `f` when a tree node is open, and pop the node after `f`.
     fn tree_body<R>(&mut self, open: bool, f: impl FnOnce(&mut Window<'_, 'f>) -> R, pop: unsafe extern "C" fn(*mut sys::nk_context)) -> Option<R> {
         open.then(|| {
-            let r = f(&mut self.reborrow());
+            let r = crate::no_unwind(|| f(&mut self.reborrow()));
             // SAFETY: the context is valid, and the tree node that was pushed is open on the current panel.
             unsafe { pop(self.raw()) };
             r
@@ -185,6 +188,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Make a tree node. Nuklear keeps its state under the bytes of `title` and `id`. The method runs `f` only when the node is open.
+    /// The hash uses only the first 2^30 bytes of `title`.
     pub fn tree<R>(&mut self, ty: TreeType, title: &str, initial: CollapseState, id: u32, f: impl FnOnce(&mut Window<'_, 'f>) -> R) -> Option<R> {
         let (hash, len) = text_arg(title);
         let title = cstr(title);
@@ -207,6 +211,7 @@ impl<'a, 'f> Window<'a, 'f> {
 
     /// Make a selectable tree node. Nuklear keeps its state under the bytes of `title` and `id`.
     /// The method runs `f` only when the node is open.
+    /// The hash uses only the first 2^30 bytes of `title`.
     pub fn tree_element<R>(
         &mut self,
         ty: TreeType,
@@ -237,6 +242,7 @@ impl<'a, 'f> Window<'a, 'f> {
 
     /// Show a combo box with the text `selected`. The method runs `f` only when the combo box is open.
     /// The method returns `None` inside a popup.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn combo_label<R>(&mut self, selected: &str, size: Vec2, f: impl FnOnce(&mut Combo<'_, 'f>) -> R) -> Option<R> {
         let (ptr, len) = text_arg(selected);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
@@ -254,6 +260,7 @@ impl<'a, 'f> Window<'a, 'f> {
 
     /// Show a combo box with a symbol and the text `selected`. The method runs `f` only when the combo box is open.
     /// The method returns `None` inside a popup.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn combo_symbol_label<R>(&mut self, selected: &str, symbol: Symbol, size: Vec2, f: impl FnOnce(&mut Combo<'_, 'f>) -> R) -> Option<R> {
         let (ptr, len) = text_arg(selected);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
@@ -263,6 +270,7 @@ impl<'a, 'f> Window<'a, 'f> {
 
     /// Show a combo box with an image and the text `selected`. The method runs `f` only when the combo box is open.
     /// The method returns `None` inside a popup.
+    /// The method uses only the first 2^30 bytes of the text.
     pub fn combo_image_label<R>(&mut self, selected: &str, img: Image, size: Vec2, f: impl FnOnce(&mut Combo<'_, 'f>) -> R) -> Option<R> {
         let (ptr, len) = text_arg(selected);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
@@ -325,7 +333,7 @@ impl<'a, 'f> Window<'a, 'f> {
         // SAFETY: the context is valid, a window is open, and the panel has no row yet.
         unsafe { sys::nk_menubar_begin(self.raw()) };
         self.ctx.panel.layout_started = true;
-        let r = f(&mut self.reborrow());
+        let r = crate::no_unwind(|| f(&mut self.reborrow()));
         // SAFETY: the context is valid, and `nk_menubar_begin` ran on the current panel.
         unsafe { sys::nk_menubar_end(self.raw()) };
         Some(r)
@@ -403,7 +411,7 @@ impl<'a, 'f> Window<'a, 'f> {
         // SAFETY: the context is valid, and a window is open.
         let open = unsafe { sys::nk_chart_begin_colored(self.raw(), ty.raw() as _, color.into(), active.into(), count, min, max) };
         open.then(|| {
-            let r = f(&mut Chart(self.reborrow()));
+            let r = crate::no_unwind(|| f(&mut Chart(self.reborrow())));
             // SAFETY: the context is valid, and the chart is open on the current panel.
             unsafe { sys::nk_chart_end(self.raw()) };
             r

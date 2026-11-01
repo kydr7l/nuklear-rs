@@ -36,7 +36,7 @@ impl TextEdit {
     }
 
     /// Replace the text. The method resets the cursor, the selection and the undo history.
-    /// The method cuts a string longer than `i32::MAX` bytes.
+    /// The method cuts a string longer than 2^30 bytes.
     /// The cut can split a UTF-8 character. In this case `text` replaces the broken bytes with U+FFFD.
     pub fn set_text(&mut self, s: &str) {
         let p = self.raw.as_ptr();
