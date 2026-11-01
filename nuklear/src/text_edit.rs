@@ -4,6 +4,9 @@ use crate::{sys, text_arg};
 use std::ptr::{addr_of, addr_of_mut, NonNull};
 
 /// A text buffer for `Window::edit`. The buffer owns its text, its cursor and its undo history.
+///
+/// Nuklear stores the cursor of an undo record as a `short`. If the text has more than 32767 runes,
+/// an undo key (`Key::TextUndo`) can fail an assertion in Nuklear. The process then aborts.
 pub struct TextEdit {
     /// This pointer comes from `Box::into_raw`. The `nk_str` inside stores a pointer to its own buffer,
     /// and Nuklear writes through the edit struct. So the struct must not move.
@@ -34,6 +37,7 @@ impl TextEdit {
 
     /// Replace the text. The method resets the cursor, the selection and the undo history.
     /// The method cuts a string longer than `i32::MAX` bytes.
+    /// The cut can split a UTF-8 character. In this case `text` replaces the broken bytes with U+FFFD.
     pub fn set_text(&mut self, s: &str) {
         let p = self.raw.as_ptr();
         let (ptr, len) = text_arg(s);

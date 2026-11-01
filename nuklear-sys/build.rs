@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf};
 
 fn main() {
-    // The flags remove C signed overflow and aliasing UB on gcc and clang.
+    // The flags remove the undefined behaviour of C signed overflow and aliasing on gcc and clang.
     cc::Build::new()
         .file("src/nuklear.c")
         .warnings(false)

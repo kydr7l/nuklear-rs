@@ -1,6 +1,29 @@
 //! Raw FFI bindings to Nuklear.
-#![allow(non_upper_case_globals, non_camel_case_types, non_snake_case, improper_ctypes)]
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+//!
+//! The crate compiles the vendored `nuklear.h` and generates the Rust declarations with `bindgen` at build time.
+//! Every `nk_*` function, type and `NK_*` constant of the header is public here.
+//! The upstream commit is in the file `nuklear/VERSION`.
+//!
+//! The functions are `unsafe`, and Nuklear checks its preconditions with `NK_ASSERT`.
+//! A failed assertion calls [`nk_rs_assert_fail`], which prints the expression and aborts the process.
+//! Use the `nuklear` crate for a safe interface.
+
+pub use bindings::*;
+
+// The lints do not fit generated code, so the allows cover only this module.
+#[allow(
+    non_upper_case_globals,
+    non_camel_case_types,
+    non_snake_case,
+    improper_ctypes,
+    missing_docs,
+    clippy::all,
+    clippy::approx_constant,
+    rustdoc::broken_intra_doc_links
+)]
+mod bindings {
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
 
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int};

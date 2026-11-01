@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 links = "nuklear"
 description = "Raw FFI bindings to the Nuklear immediate mode GUI library."
+license = "MIT OR Apache-2.0"
+repository = ""
 
 [build-dependencies]
 bindgen = "0.72"

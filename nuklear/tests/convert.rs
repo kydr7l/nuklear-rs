@@ -16,7 +16,7 @@ fn layout() -> VertexLayout {
     let total: u32 = ctx.convert(&mut cmds, &mut verts, &mut elems, &cfg).unwrap().map(|d| d.elem_count).sum();
     assert!(total > 0);
     assert_eq!(total as usize, elems.as_indices().len());
-    assert!(verts.len() > 0 && verts.len() % 20 == 0);
+    assert!(!verts.is_empty() && verts.len() % 20 == 0);
     let max_index = *elems.as_indices().iter().max().unwrap() as usize;
     assert!(max_index < verts.len() / 20);
     ctx.clear();

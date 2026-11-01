@@ -10,42 +10,234 @@ use std::ptr::addr_of;
 /// All positions and sizes use the types of the C structs. Nuklear gives them as integers in pixels.
 /// A command borrows the context, so the context cannot change while a command lives.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)] // The fields have the names and the meaning of the fields of the C structs.
 pub enum Command<'a> {
     /// Set the clip rectangle.
-    Scissor { x: i16, y: i16, w: u16, h: u16 },
+    Scissor {
+        /// The x coordinate of the left edge.
+        x: i16,
+        /// The y coordinate of the top edge.
+        y: i16,
+        /// The width.
+        w: u16,
+        /// The height.
+        h: u16,
+    },
     /// Draw a line.
-    Line { thickness: u16, begin: Vec2i, end: Vec2i, color: Color },
+    Line {
+        /// The line thickness in pixels.
+        thickness: u16,
+        /// The start point.
+        begin: Vec2i,
+        /// The end point.
+        end: Vec2i,
+        /// The line color.
+        color: Color,
+    },
     /// Draw a curve.
-    Curve { thickness: u16, begin: Vec2i, end: Vec2i, ctrl: [Vec2i; 2], color: Color },
+    Curve {
+        /// The line thickness in pixels.
+        thickness: u16,
+        /// The start point.
+        begin: Vec2i,
+        /// The end point.
+        end: Vec2i,
+        /// The two control points of the curve.
+        ctrl: [Vec2i; 2],
+        /// The line color.
+        color: Color,
+    },
     /// Draw a rectangle outline.
-    Rect { rounding: u16, thickness: u16, x: i16, y: i16, w: u16, h: u16, color: Color },
+    Rect {
+        /// The corner radius in pixels.
+        rounding: u16,
+        /// The line thickness in pixels.
+        thickness: u16,
+        /// The x coordinate of the left edge.
+        x: i16,
+        /// The y coordinate of the top edge.
+        y: i16,
+        /// The width.
+        w: u16,
+        /// The height.
+        h: u16,
+        /// The line color.
+        color: Color,
+    },
     /// Draw a filled rectangle.
-    RectFilled { rounding: u16, x: i16, y: i16, w: u16, h: u16, color: Color },
+    RectFilled {
+        /// The corner radius in pixels.
+        rounding: u16,
+        /// The x coordinate of the left edge.
+        x: i16,
+        /// The y coordinate of the top edge.
+        y: i16,
+        /// The width.
+        w: u16,
+        /// The height.
+        h: u16,
+        /// The fill color.
+        color: Color,
+    },
     /// Draw a filled rectangle with one color for each side.
-    RectMultiColor { x: i16, y: i16, w: u16, h: u16, left: Color, top: Color, bottom: Color, right: Color },
+    RectMultiColor {
+        /// The x coordinate of the left edge.
+        x: i16,
+        /// The y coordinate of the top edge.
+        y: i16,
+        /// The width.
+        w: u16,
+        /// The height.
+        h: u16,
+        /// The color at the left side.
+        left: Color,
+        /// The color at the top side.
+        top: Color,
+        /// The color at the bottom side.
+        bottom: Color,
+        /// The color at the right side.
+        right: Color,
+    },
     /// Draw a circle outline.
-    Circle { thickness: u16, x: i16, y: i16, w: u16, h: u16, color: Color },
+    Circle {
+        /// The line thickness in pixels.
+        thickness: u16,
+        /// The x coordinate of the left edge of the bounding box.
+        x: i16,
+        /// The y coordinate of the top edge of the bounding box.
+        y: i16,
+        /// The width of the bounding box.
+        w: u16,
+        /// The height of the bounding box.
+        h: u16,
+        /// The line color.
+        color: Color,
+    },
     /// Draw a filled circle.
-    CircleFilled { x: i16, y: i16, w: u16, h: u16, color: Color },
+    CircleFilled {
+        /// The x coordinate of the left edge of the bounding box.
+        x: i16,
+        /// The y coordinate of the top edge of the bounding box.
+        y: i16,
+        /// The width of the bounding box.
+        w: u16,
+        /// The height of the bounding box.
+        h: u16,
+        /// The fill color.
+        color: Color,
+    },
     /// Draw an arc outline.
-    Arc { cx: i16, cy: i16, r: u16, thickness: u16, a: [f32; 2], color: Color },
+    Arc {
+        /// The x coordinate of the center.
+        cx: i16,
+        /// The y coordinate of the center.
+        cy: i16,
+        /// The radius in pixels.
+        r: u16,
+        /// The line thickness in pixels.
+        thickness: u16,
+        /// The begin angle and the end angle in radians.
+        a: [f32; 2],
+        /// The line color.
+        color: Color,
+    },
     /// Draw a filled arc.
-    ArcFilled { cx: i16, cy: i16, r: u16, a: [f32; 2], color: Color },
+    ArcFilled {
+        /// The x coordinate of the center.
+        cx: i16,
+        /// The y coordinate of the center.
+        cy: i16,
+        /// The radius in pixels.
+        r: u16,
+        /// The begin angle and the end angle in radians.
+        a: [f32; 2],
+        /// The fill color.
+        color: Color,
+    },
     /// Draw a triangle outline.
-    Triangle { thickness: u16, a: Vec2i, b: Vec2i, c: Vec2i, color: Color },
+    Triangle {
+        /// The line thickness in pixels.
+        thickness: u16,
+        /// The first corner.
+        a: Vec2i,
+        /// The second corner.
+        b: Vec2i,
+        /// The third corner.
+        c: Vec2i,
+        /// The line color.
+        color: Color,
+    },
     /// Draw a filled triangle.
-    TriangleFilled { a: Vec2i, b: Vec2i, c: Vec2i, color: Color },
+    TriangleFilled {
+        /// The first corner.
+        a: Vec2i,
+        /// The second corner.
+        b: Vec2i,
+        /// The third corner.
+        c: Vec2i,
+        /// The fill color.
+        color: Color,
+    },
     /// Draw a polygon outline.
-    Polygon { color: Color, thickness: u16, points: &'a [Vec2i] },
+    Polygon {
+        /// The line color.
+        color: Color,
+        /// The line thickness in pixels.
+        thickness: u16,
+        /// The corner points.
+        points: &'a [Vec2i],
+    },
     /// Draw a filled polygon.
-    PolygonFilled { color: Color, points: &'a [Vec2i] },
+    PolygonFilled {
+        /// The fill color.
+        color: Color,
+        /// The corner points.
+        points: &'a [Vec2i],
+    },
     /// Draw a line through the points.
-    Polyline { color: Color, thickness: u16, points: &'a [Vec2i] },
+    Polyline {
+        /// The line color.
+        color: Color,
+        /// The line thickness in pixels.
+        thickness: u16,
+        /// The points of the line.
+        points: &'a [Vec2i],
+    },
     /// Draw text. Each invalid UTF-8 byte sequence of the text becomes U+FFFD.
-    Text { font: Handle, font_height: f32, background: Color, foreground: Color, x: i16, y: i16, w: u16, h: u16, text: Cow<'a, str> },
+    Text {
+        /// The texture handle of the font. A renderer uses it to select the font.
+        font: Handle,
+        /// The font height in pixels.
+        font_height: f32,
+        /// The color behind the text.
+        background: Color,
+        /// The text color.
+        foreground: Color,
+        /// The x coordinate of the left edge of the text box.
+        x: i16,
+        /// The y coordinate of the top edge of the text box.
+        y: i16,
+        /// The width of the text box.
+        w: u16,
+        /// The height of the text box.
+        h: u16,
+        /// The text.
+        text: Cow<'a, str>,
+    },
     /// Draw an image.
-    Image { x: i16, y: i16, w: u16, h: u16, img: Image, color: Color },
+    Image {
+        /// The x coordinate of the left edge.
+        x: i16,
+        /// The y coordinate of the top edge.
+        y: i16,
+        /// The width.
+        w: u16,
+        /// The height.
+        h: u16,
+        /// The image, with its texture handle and its region.
+        img: Image,
+        /// The color that tints the image.
+        color: Color,
+    },
     /// A custom command or a command of an unknown type. The wrapper has no data for it.
     Custom,
 }
@@ -67,7 +259,7 @@ impl<'f> Context<'f> {
     /// The method ends the frame build. After it, `window` and `window_titled` return `None` until `clear` runs.
     /// A command borrows the context, so this code does not compile:
     ///
-    /// ```compile_fail,E0502
+    /// ```compile_fail,E0499
     /// use nuklear::*;
     /// struct F;
     /// impl Font for F {
@@ -259,7 +451,7 @@ mod tests {
 
     const BOUNDS: Rect = Rect { x: 0.0, y: 0.0, w: 200.0, h: 200.0 };
 
-    /// Draw a window "a" with a static popup. The popup code uses `sys`, because the wrapper has no popup method yet.
+    /// Draw a window "a" with a static popup. The popup code calls the `sys` functions directly.
     fn draw_a_with_popup(ctx: &mut Context<'_>) {
         ctx.window("a", BOUNDS, PanelFlags::BORDER, |w| {
             w.layout_row_dynamic(30.0, 1);

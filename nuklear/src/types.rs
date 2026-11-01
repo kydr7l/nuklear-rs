@@ -301,7 +301,6 @@ macro_rules! sys_enum {
             )+
         }
         impl $name {
-            #[allow(dead_code)] // Later tasks call this function.
             pub(crate) fn raw(self) -> u32 { self as u32 }
         }
     };

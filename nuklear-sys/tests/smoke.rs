@@ -5,9 +5,7 @@ unsafe extern "C" fn width(_: nk_handle, _: f32, _: *const c_char, len: c_int) -
 
 #[test]
 fn init_begin_end_free() {
-    let mut font = nk_user_font::default();
-    font.height = 12.0;
-    font.width = Some(width);
+    let font = nk_user_font { height: 12.0, width: Some(width), ..Default::default() };
     let mut ctx: Box<nk_context> = Box::default();
     unsafe {
         assert!(nk_init_default(&mut *ctx, &font));
