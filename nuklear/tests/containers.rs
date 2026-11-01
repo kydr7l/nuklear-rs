@@ -143,3 +143,51 @@ fn frame<R>(f: impl FnOnce(&mut Window<'_, '_>) -> R) -> Option<R> {
     );
     ctx.clear();
 }
+
+// `nk_panel_begin` reads the mouse of a MOVABLE panel through a null input pointer when NO_INPUT is set.
+fn move_no_input() -> PanelFlags { PanelFlags::MOVABLE | PanelFlags::NO_INPUT | PanelFlags::TITLE }
+
+/// Run three frames. Frame 1 presses the left button at (50, 50), and frame 2 drags the mouse to (60, 60).
+fn three_frames(mut body: impl FnMut(&mut Context<'_>)) {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    for frame in 0..3 {
+        match frame {
+            1 => ctx.input(|i| { i.motion(50, 50); i.button(Button::Left, 50, 50, true); }),
+            2 => ctx.input(|i| i.motion(60, 60)),
+            _ => {}
+        }
+        body(&mut ctx);
+        ctx.clear();
+    }
+}
+#[test] fn movable_no_input_window() {
+    three_frames(|ctx| { ctx.window("a", WIN, move_no_input(), |_| ()); });
+}
+#[test] fn movable_no_input_group() {
+    three_frames(|ctx| { ctx.window("w", WIN, PanelFlags::empty(), |w| { w.layout_row_dynamic(200.0, 1); w.group("g", move_no_input(), |_| ()); }); });
+}
+#[test] fn movable_no_input_group_scrolled() {
+    let mut scroll = (0, 0);
+    three_frames(|ctx| { ctx.window("w", WIN, PanelFlags::empty(), |w| { w.layout_row_dynamic(200.0, 1); w.group_scrolled(&mut scroll, "g", move_no_input(), |_| ()); }); });
+}
+#[test] fn movable_no_input_popup() {
+    let bounds = Rect { x: 10.0, y: 10.0, w: 200.0, h: 200.0 };
+    three_frames(|ctx| { ctx.window("w", WIN, PanelFlags::empty(), |w| { w.layout_row_dynamic(30.0, 1); w.popup(PopupType::Static, "p", move_no_input(), bounds, |_| ()); }); });
+}
+#[test] fn movable_no_input_contextual() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    let mut opened = Vec::new();
+    for frame in 0..3 {
+        if frame == 1 {
+            ctx.input(|i| { i.motion(50, 50); i.button(Button::Right, 50, 50, true); i.button(Button::Right, 50, 50, false); });
+        }
+        ctx.window("w", WIN, PanelFlags::empty(), |w| {
+            w.layout_row_dynamic(30.0, 1);
+            opened.push(w.contextual(move_no_input(), Vec2 { x: 100.0, y: 100.0 }, WIN, |_| ()).is_some());
+        });
+        ctx.clear();
+    }
+    assert_eq!(opened, [false, true, true]);
+}

@@ -163,7 +163,7 @@ impl From<Image> for sys::nk_image {
 
 /// Make a flag set type. `from_bits` keeps only the bits of the listed constants.
 macro_rules! flags {
-    ($(#[$m:meta])* $name:ident { $($c:ident = $v:expr;)+ }) => {
+    ($(#[$m:meta])* $name:ident { $($(#[$cm:meta])* $c:ident = $v:expr;)+ }) => {
         $(#[$m])*
         #[repr(transparent)]
         #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
@@ -172,6 +172,7 @@ macro_rules! flags {
         impl $name {
             $(
                 #[doc = concat!("The `", stringify!($c), "` flag.")]
+                $(#[$cm])*
                 pub const $c: Self = Self($v);
             )+
             /// The union of all defined flags.
@@ -212,7 +213,21 @@ flags! {
         SCROLL_AUTO_HIDE = sys::NK_WINDOW_SCROLL_AUTO_HIDE as u32;
         BACKGROUND = sys::NK_WINDOW_BACKGROUND as u32;
         SCALE_LEFT = sys::NK_WINDOW_SCALE_LEFT as u32;
+        ///
+        /// This flag turns off `MOVABLE`. Nuklear reads the mouse to move a panel, and a panel with this flag has no input.
         NO_INPUT = sys::NK_WINDOW_NO_INPUT as u32;
+    }
+}
+
+impl PanelFlags {
+    /// Get the bits to give to Nuklear. The method removes `MOVABLE` when `NO_INPUT` is set.
+    /// `nk_panel_begin` reads the mouse of a movable panel through a null input pointer when `NO_INPUT` is set.
+    pub(crate) const fn c_bits(self) -> u32 {
+        if self.contains(Self::NO_INPUT) {
+            self.0 & !Self::MOVABLE.0
+        } else {
+            self.0
+        }
     }
 }
 
@@ -453,6 +468,7 @@ mod tests {
     #[test] fn rect_roundtrip() { let r = Rect { x: 1.0, y: 2.0, w: 3.0, h: 4.0 }; assert_eq!(Rect::from(sys::nk_rect::from(r)), r); }
     #[test] fn handle_id_and_ptr_read_back() { assert_eq!(Handle::id(7).as_id(), 7); assert!(Handle::id(0).as_ptr().is_null()); let p = 0x10usize as *mut std::ffi::c_void; assert_eq!(Handle::ptr(p).as_ptr(), p); }
     #[test] fn flags_or_and_contains() { let f = PanelFlags::BORDER | PanelFlags::TITLE; assert!(f.contains(PanelFlags::TITLE)); assert!(!f.contains(PanelFlags::MOVABLE)); assert_eq!(f.bits(), sys::NK_WINDOW_BORDER as u32 | sys::NK_WINDOW_TITLE as u32); }
+    #[test] fn c_bits_drops_movable_without_input() { let m = PanelFlags::MOVABLE; assert_eq!(m.c_bits(), m.bits()); assert_eq!((m | PanelFlags::NO_INPUT).c_bits(), PanelFlags::NO_INPUT.bits()); }
     #[test] fn enum_values_match_sys() { assert_eq!(Key::Enter.raw(), sys::NK_KEY_ENTER as u32); assert_eq!(Symbol::Hamburger.raw(), sys::NK_SYMBOL_HAMBURGER as u32); assert_eq!(VertexFormat::Rgba32.raw(), sys::NK_FORMAT_RGBA32 as u32); }
     #[test] fn image_roundtrip_through_sys() { let i = Image::new(Handle::id(9), 4, 5); let back = Image::from_sys(sys::nk_image::from(i)); assert_eq!(back, i); assert_eq!(back.handle.as_id(), 9); assert_eq!(back.region, [0, 0, 4, 5]); }
     #[test] fn cstr_truncates_at_nul() { assert_eq!(crate::cstr("ab\0cd").as_bytes(), b"ab"); }

@@ -158,7 +158,7 @@ impl<'f> Context<'f> {
         }
         let (name, title) = (cstr(name), cstr(title));
         // SAFETY: the context is valid, and both strings end with NUL. Nuklear copies the strings.
-        let open = unsafe { sys::nk_begin_titled(self.raw(), name.as_ptr(), title.as_ptr(), bounds.into(), flags.bits()) };
+        let open = unsafe { sys::nk_begin_titled(self.raw(), name.as_ptr(), title.as_ptr(), bounds.into(), flags.c_bits()) };
         if !open {
             self.reset_hidden_buffer();
         }

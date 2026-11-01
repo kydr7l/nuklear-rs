@@ -150,7 +150,7 @@ impl<'a, 'f> Window<'a, 'f> {
     pub fn group<R>(&mut self, title: &str, flags: PanelFlags, f: impl FnOnce(&mut Window<'_, 'f>) -> R) -> Option<R> {
         let title = cstr(title);
         // SAFETY: the context is valid, a window is open, and `title` ends with NUL. Nuklear copies the title into its hash and draw commands.
-        self.group_scope(|ctx| unsafe { sys::nk_group_begin_titled(ctx, title.as_ptr(), title.as_ptr(), flags.bits()) }, f)
+        self.group_scope(|ctx| unsafe { sys::nk_group_begin_titled(ctx, title.as_ptr(), title.as_ptr(), flags.c_bits()) }, f)
     }
 
     /// Make a group that keeps its scroll offset `(x, y)` in `scroll`. The method runs `f` only when the group is open.
@@ -165,7 +165,7 @@ impl<'a, 'f> Window<'a, 'f> {
         let (x, y) = (&mut scroll.0 as *mut u32, &mut scroll.1 as *mut u32);
         // SAFETY: the context is valid, a window is open, and `title` ends with NUL.
         // Nuklear keeps `x` and `y` until `nk_group_end`. `scroll` stays borrowed until this method returns.
-        self.group_scope(|ctx| unsafe { sys::nk_group_scrolled_offset_begin(ctx, x, y, title.as_ptr(), flags.bits()) }, f)
+        self.group_scope(|ctx| unsafe { sys::nk_group_scrolled_offset_begin(ctx, x, y, title.as_ptr(), flags.c_bits()) }, f)
     }
 
     /// Forget the layout state before a tree header. Nuklear starts its own row for the header.
@@ -231,7 +231,7 @@ impl<'a, 'f> Window<'a, 'f> {
     pub fn popup<R>(&mut self, ty: PopupType, title: &str, flags: PanelFlags, bounds: Rect, f: impl FnOnce(&mut Popup<'_, 'f>) -> R) -> Option<R> {
         let title = cstr(title);
         // SAFETY: the context is valid, a window is open, and `title` ends with NUL.
-        let begin = |w: &mut Self| unsafe { sys::nk_popup_begin(w.raw(), ty.raw() as _, title.as_ptr(), flags.bits(), bounds.into()) };
+        let begin = |w: &mut Self| unsafe { sys::nk_popup_begin(w.raw(), ty.raw() as _, title.as_ptr(), flags.c_bits(), bounds.into()) };
         self.popup_scope(begin, |w| f(&mut Popup(w)), sys::nk_popup_end)
     }
 
@@ -302,12 +302,13 @@ impl<'a, 'f> Window<'a, 'f> {
                 !(*win).popup.win.is_null() && (*win).popup.type_ == sys::NK_PANEL_CONTEXTUAL as _,
             )
         };
-        // Nuklear reads the popup window of the contextual menu here, and that window can be absent.
+        // A window has one popup slot. `nk_nonblock_begin` reuses `popup.win` and does not check its type.
+        // So without this check, a contextual menu takes over the slot of an active static popup.
         if rom && !open {
             return None;
         }
         // SAFETY: the context is valid, and a window is open.
-        let begin = |w: &mut Self| unsafe { sys::nk_contextual_begin(w.raw(), flags.bits(), size.into(), trigger.into()) };
+        let begin = |w: &mut Self| unsafe { sys::nk_contextual_begin(w.raw(), flags.c_bits(), size.into(), trigger.into()) };
         self.popup_scope(begin, |w| f(&mut Contextual(w)), sys::nk_contextual_end)
     }
 
