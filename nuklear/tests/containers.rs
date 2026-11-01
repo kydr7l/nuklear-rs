@@ -201,3 +201,114 @@ fn three_frames(mut body: impl FnMut(&mut Context<'_>)) {
     });
     assert_eq!(r, Some((None, None)));
 }
+
+fn center(r: Rect) -> (i32, i32) {
+    ((r.x + r.w / 2.0) as i32, (r.y + r.h / 2.0) as i32)
+}
+/// Press `button` in the middle of `at` in the next frame.
+fn press(ctx: &mut Context<'_>, button: Button, at: Rect) {
+    let (x, y) = center(at);
+    ctx.input(|i| { i.motion(x, y); i.button(button, x, y, true); });
+}
+/// Release `button` in the middle of `at` in the next frame. A new press needs a release first.
+fn release(ctx: &mut Context<'_>, button: Button, at: Rect) {
+    let (x, y) = center(at);
+    ctx.input(|i| i.button(button, x, y, false));
+}
+/// Run one frame of the window `w` with `f` as its body.
+fn run<R>(ctx: &mut Context<'_>, f: impl FnOnce(&mut Window<'_, '_>) -> R) -> R {
+    let r = ctx.window("w", WIN, PanelFlags::empty(), f).unwrap();
+    ctx.clear();
+    r
+}
+const POPUP: Vec2 = Vec2 { x: 100.0, y: 100.0 };
+
+#[test] fn combo_opens_selects_and_closes_with_clicks() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    let items = ["a", "b", "c"];
+    let mut sel = 0usize;
+    let (header, changed) = run(&mut ctx, |w| { w.layout_row_dynamic(30.0, 1); (w.widget_bounds(), w.combo(&items, &mut sel, 25, POPUP)) });
+    assert!(!changed);
+    // The click on the header opens the combo box. Its body has the layout of `combo`, so it shows where item "c" is.
+    press(&mut ctx, Button::Left, header);
+    let item = run(&mut ctx, |w| {
+        w.layout_row_dynamic(30.0, 1);
+        w.combo_label("a", POPUP, |c| { c.layout_row_dynamic(25.0, 1); c.item_label("a", TextAlign::LEFT); c.item_label("b", TextAlign::LEFT); c.widget_bounds() })
+    });
+    let item = item.expect("the header click opens the combo box");
+    release(&mut ctx, Button::Left, header);
+    assert!(!run(&mut ctx, |w| { w.layout_row_dynamic(30.0, 1); w.combo(&items, &mut sel, 25, POPUP) }));
+    press(&mut ctx, Button::Left, item);
+    assert!(run(&mut ctx, |w| { w.layout_row_dynamic(30.0, 1); w.combo(&items, &mut sel, 25, POPUP) }));
+    assert_eq!(sel, 2);
+    // `close` in the body closes the combo box after the frame. A new context has no popup state of the item click.
+    let mut ctx = Context::new(&font).unwrap();
+    let combo = |ctx: &mut Context<'_>, close: bool| run(ctx, |w| { w.layout_row_dynamic(30.0, 1); w.combo_label("c", POPUP, |c| if close { c.close() }).is_some() });
+    assert!(!combo(&mut ctx, false));
+    press(&mut ctx, Button::Left, header);
+    assert!(combo(&mut ctx, true));
+    release(&mut ctx, Button::Left, header);
+    assert!(!combo(&mut ctx, false));
+}
+
+#[test] fn menu_opens_clicks_an_item_and_closes() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    // The body of each frame. `item` is the body of the open menu. The result is the header bounds and the result of the menu.
+    fn bar<R>(w: &mut Window<'_, '_>, item: impl FnOnce(&mut Menu<'_, '_>) -> R) -> (Rect, Option<R>) {
+        w.menubar(|m| {
+            m.layout_row_static(25.0, 60, 1);
+            let b = m.widget_bounds();
+            (b, m.menu_label("File", TextAlign::LEFT, POPUP, item))
+        })
+        .unwrap()
+    }
+    let (header, closed) = run(&mut ctx, |w| bar(w, |_| ()));
+    assert!(closed.is_none());
+    press(&mut ctx, Button::Left, header);
+    let (_, item) = run(&mut ctx, |w| bar(w, |m| { m.layout_row_dynamic(25.0, 1); m.item_label("New", TextAlign::LEFT); let b = m.widget_bounds(); m.item_label("Open", TextAlign::LEFT); b }));
+    let item = item.expect("the header click opens the menu");
+    release(&mut ctx, Button::Left, header);
+    run(&mut ctx, |w| bar(w, |_| ()));
+    press(&mut ctx, Button::Left, item);
+    let (_, clicked) = run(&mut ctx, |w| bar(w, |m| { m.layout_row_dynamic(25.0, 1); m.item_label("New", TextAlign::LEFT); m.item_label("Open", TextAlign::LEFT) }));
+    assert_eq!(clicked, Some(true));
+    // The item click closed the menu.
+    release(&mut ctx, Button::Left, item);
+    assert!(run(&mut ctx, |w| bar(w, |_| ())).1.is_none());
+    // Open the menu in a new context, and close it with `close`.
+    let mut ctx = Context::new(&font).unwrap();
+    run(&mut ctx, |w| bar(w, |_| ()));
+    press(&mut ctx, Button::Left, header);
+    assert!(run(&mut ctx, |w| bar(w, |m| m.close())).1.is_some());
+    release(&mut ctx, Button::Left, header);
+    assert!(run(&mut ctx, |w| bar(w, |_| ())).1.is_none());
+}
+
+#[test] fn contextual_opens_on_right_click_clicks_an_item_and_closes() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    fn menu<R>(w: &mut Window<'_, '_>, f: impl FnOnce(&mut Contextual<'_, '_>) -> R) -> Option<R> {
+        w.layout_row_dynamic(30.0, 1);
+        w.contextual(PanelFlags::empty(), POPUP, WIN, f)
+    }
+    let spot = Rect { x: 150.0, y: 150.0, w: 0.0, h: 0.0 };
+    assert!(run(&mut ctx, |w| menu(w, |_| ())).is_none());
+    let right_click = |ctx: &mut Context<'_>| { let (x, y) = center(spot); ctx.input(|i| { i.motion(x, y); i.button(Button::Right, x, y, true); i.button(Button::Right, x, y, false); }) };
+    right_click(&mut ctx);
+    let item = run(&mut ctx, |w| menu(w, |c| { c.layout_row_dynamic(25.0, 1); c.item_label("Cut", TextAlign::LEFT); let b = c.widget_bounds(); c.item_label("Copy", TextAlign::LEFT); b }));
+    let item = item.expect("the right click opens the contextual menu");
+    press(&mut ctx, Button::Left, item);
+    let clicked = run(&mut ctx, |w| menu(w, |c| { c.layout_row_dynamic(25.0, 1); c.item_label("Cut", TextAlign::LEFT); c.item_label("Copy", TextAlign::LEFT) }));
+    assert_eq!(clicked, Some(true));
+    release(&mut ctx, Button::Left, item);
+    assert!(run(&mut ctx, |w| menu(w, |_| ())).is_none());
+    // Open the menu in a new context, and close it with `close`.
+    let mut ctx = Context::new(&font).unwrap();
+    right_click(&mut ctx);
+    assert!(run(&mut ctx, |w| menu(w, |c| c.close())).is_some());
+    // A frame without an input scope keeps the click counts of the last input, so send an empty input.
+    ctx.input(|_| ());
+    assert!(run(&mut ctx, |w| menu(w, |_| ())).is_none());
+}
