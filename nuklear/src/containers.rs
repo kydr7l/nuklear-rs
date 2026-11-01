@@ -392,7 +392,7 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a chart for `count` values from `min` to `max`. `active` is the color of a value under the mouse.
-    /// The method runs `f` only when the chart is visible. It returns `None` when `count <= 0` or a limit is not finite.
+    /// The method runs `f` only when the chart is visible. It returns `None` when `count <= 0`, a limit is not finite, or `min == max`.
     #[allow(clippy::too_many_arguments)] // The arguments match `nk_chart_begin_colored`.
     pub fn chart_colored<R>(
         &mut self,
@@ -404,8 +404,8 @@ impl<'a, 'f> Window<'a, 'f> {
         max: f32,
         f: impl FnOnce(&mut Chart<'_, 'f>) -> R,
     ) -> Option<R> {
-        // Nuklear divides by `count`.
-        if count <= 0 || !min.is_finite() || !max.is_finite() {
+        // Nuklear divides by `count` and by `max - min`.
+        if count <= 0 || !min.is_finite() || !max.is_finite() || min == max {
             return None;
         }
         // SAFETY: the context is valid, and a window is open.

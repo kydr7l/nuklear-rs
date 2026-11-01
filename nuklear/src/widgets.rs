@@ -263,15 +263,25 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a chart of `values` from the index `offset`. The method does nothing when no value is left
-    /// or a value is not finite.
+    /// or a value is not finite. When all values are equal to `v`, the chart range is `v - 0.5` to `v + 0.5`.
+    /// For a large `v`, this range can stay empty. Then the method draws nothing.
     pub fn plot(&mut self, ty: ChartType, values: &[f32], offset: usize) {
         let values = values.get(offset..).unwrap_or_default();
-        let count = values.len().min(i32::MAX as usize);
-        if count == 0 || !values[..count].iter().all(|v| v.is_finite()) {
+        let values = &values[..values.len().min(i32::MAX as usize)];
+        let Some(&first) = values.first() else { return };
+        if !values.iter().all(|v| v.is_finite()) {
             return;
         }
-        // SAFETY: the context is valid, a window is open, and `values` holds `count` floats. The C offset is 0.
-        unsafe { sys::nk_plot(self.raw(), ty.raw() as _, values.as_ptr(), count as i32, 0) }
+        let (mut min, mut max) = values.iter().fold((first, first), |(lo, hi), &v| (lo.min(v), hi.max(v)));
+        // `nk_plot` would divide by `max - min`, and the chart rejects an empty range.
+        if min == max {
+            (min, max) = (min - 0.5, max + 0.5);
+        }
+        self.chart(ty, values.len() as i32, min, max, |c| {
+            for &v in values {
+                c.push(v);
+            }
+        });
     }
 
     /// Show a tooltip with `text`. The method does nothing inside a popup.

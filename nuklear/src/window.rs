@@ -252,10 +252,15 @@ impl Window<'_, '_> {
         unsafe { sys::nk_layout_widget_bounds(self.ctx.raw_const()) }.into()
     }
 
-    /// Change a width in pixels to a ratio of the window width.
+    /// Change a width in pixels to a ratio of the window width. The ratio is in the range 0 to 1.
+    /// The method returns 0 when `pixel_width` is 0 or the window width is not positive.
     pub fn layout_ratio_from_pixel(&self, pixel_width: f32) -> f32 {
-        // SAFETY: the context is valid, and an open window with a layout is current.
-        unsafe { sys::nk_layout_ratio_from_pixel(self.ctx.raw_const(), pixel_width) }
+        // `nk_layout_ratio_from_pixel` asserts on 0 and divides by the x position of the window, not by its width.
+        let width = self.bounds().w;
+        if pixel_width == 0.0 || width <= 0.0 {
+            return 0.0;
+        }
+        (pixel_width / width).clamp(0.0, 1.0)
     }
 
     /// Skip one widget slot of the current row. The method does nothing when the row has no columns.

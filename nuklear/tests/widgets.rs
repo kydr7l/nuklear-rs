@@ -197,6 +197,9 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
             let mut v = big;
             assert!(!w.property_f32("c", -1e10, &mut v, 1e10, 1.0, 1.0));
             assert_eq!(v, big);
+            // Only the value is out of range here.
+            assert!(!w.property_f32("g", 0.0, &mut v, 10.0, 1.0, 1.0));
+            assert_eq!(v, big);
         }
         for big in [3e9f64, -3e9] {
             let mut v = 1.0f64;
@@ -206,7 +209,36 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
             let mut v = big;
             assert!(!w.property_f64("f", -1e10, &mut v, 1e10, 1.0, 1.0));
             assert_eq!(v, big);
+            // Only the value is out of range here.
+            assert!(!w.property_f64("h", 0.0, &mut v, 10.0, 1.0, 1.0));
+            assert_eq!(v, big);
         }
     });
+    ctx.clear();
+}
+// With equal values, Nuklear divides 0 by 0 and casts the NaN to `short`. `plot` widens the range, so the lines stay inside the chart.
+#[test] fn plot_of_equal_values_draws_inside_the_chart() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    let b = ctx.window("w", WIN, PanelFlags::empty(), |w| {
+        w.layout_row_dynamic(100.0, 1);
+        let b = w.widget_bounds();
+        w.plot(ChartType::Lines, &[0.0; 5], 0);
+        b
+    }).unwrap();
+    let ys: Vec<f32> = ctx.commands().filter_map(|c| match c { Command::Line { begin, end, .. } => Some([begin.y as f32, end.y as f32]), _ => None }).flatten().collect();
+    assert!(!ys.is_empty());
+    assert!(ys.iter().all(|&y| y > b.y && y < b.y + b.h), "{ys:?} outside {b:?}");
+    ctx.clear();
+}
+// Nuklear asserts on a zero width and divides by the window x position instead of the width.
+#[test] fn layout_ratio_from_pixel_uses_the_window_width() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    let r = ctx.window("w", Rect { x: 0.0, y: 0.0, w: 200.0, h: 100.0 }, PanelFlags::empty(), |w| {
+        w.layout_row_dynamic(20.0, 1);
+        (w.layout_ratio_from_pixel(50.0), w.layout_ratio_from_pixel(400.0), w.layout_ratio_from_pixel(0.0))
+    });
+    assert_eq!(r, Some((0.25, 1.0, 0.0)));
     ctx.clear();
 }

@@ -191,3 +191,13 @@ fn three_frames(mut body: impl FnMut(&mut Context<'_>)) {
     }
     assert_eq!(opened, [false, true, true]);
 }
+// Nuklear divides 0 by 0 for a chart with `min == max`.
+#[test] fn chart_with_an_empty_range_is_rejected() {
+    let r = frame(|w| {
+        w.layout_row_dynamic(30.0, 1);
+        let plain = w.chart(ChartType::Lines, 3, 1.0, 1.0, |_| ());
+        let colored = w.chart_colored(ChartType::Column, Color::default(), Color::default(), 3, 2.0, 2.0, |_| ());
+        (plain, colored)
+    });
+    assert_eq!(r, Some((None, None)));
+}
