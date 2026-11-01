@@ -3,13 +3,20 @@
 //! Every text method passes the pointer and the length of the Rust string to a Nuklear `_text` function.
 //! None of these functions reads the string up to a NUL byte.
 
-use crate::{cstr, sys, text_arg, ButtonBehavior, ChartType, Color, ColorFormat, Colorf, Heading, Image, Symbol, TextAlign, Window};
+use crate::{cstr, EditEvents, EditFlags, Filter, TextEdit, sys, text_arg, ButtonBehavior, ChartType, Color, ColorFormat, Colorf, Heading, Image, Symbol, TextAlign, Window};
 
 /// The largest absolute value of a float property, exclusive. `nk_dtoa` casts the value to `int` and
 /// writes past its 64 byte buffer when the cast is out of range. NaN fails the `<` test too.
 const PROPERTY_LIMIT: f32 = 2_147_483_648.0;
 
 impl<'a, 'f> Window<'a, 'f> {
+    /// Show a text edit widget. The widget edits `edit` and drops the characters that `filter` rejects.
+    pub fn edit(&mut self, flags: EditFlags, edit: &mut TextEdit, filter: Filter) -> EditEvents {
+        // SAFETY: the context is valid, a window is open, and the pointer comes from the unique `TextEdit`.
+        let r = unsafe { sys::nk_edit_buffer(self.raw(), flags.bits(), edit.raw(), filter.raw()) };
+        EditEvents::from_bits(r)
+    }
+
     /// Show a text label.
     pub fn label(&mut self, text: &str, align: TextAlign) {
         let (ptr, len) = text_arg(text);

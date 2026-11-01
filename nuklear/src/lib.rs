@@ -21,6 +21,9 @@ pub use command::*;
 
 mod widgets;
 
+pub mod text_edit;
+pub use text_edit::*;
+
 pub mod containers;
 pub use containers::*;
 

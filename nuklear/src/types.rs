@@ -462,6 +462,21 @@ pub enum Filter {
     Binary,
 }
 
+impl Filter {
+    /// Get the Nuklear filter function.
+    pub(crate) fn raw(self) -> sys::nk_plugin_filter {
+        Some(match self {
+            Filter::Default => sys::nk_filter_default,
+            Filter::Ascii => sys::nk_filter_ascii,
+            Filter::Float => sys::nk_filter_float,
+            Filter::Decimal => sys::nk_filter_decimal,
+            Filter::Hex => sys::nk_filter_hex,
+            Filter::Oct => sys::nk_filter_oct,
+            Filter::Binary => sys::nk_filter_binary,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
