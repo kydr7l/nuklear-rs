@@ -1,0 +1,3 @@
+[workspace]
+members = ["nuklear-sys"]
+resolver = "2"
