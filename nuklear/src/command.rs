@@ -78,7 +78,7 @@ pub enum Command<'a> {
         /// The fill color.
         color: Color,
     },
-    /// Draw a filled rectangle with one color for each side.
+    /// Draw a filled rectangle with one color for each corner.
     RectMultiColor {
         /// The x coordinate of the left edge.
         x: i16,
@@ -88,13 +88,13 @@ pub enum Command<'a> {
         w: u16,
         /// The height.
         h: u16,
-        /// The color at the left side.
+        /// The color of the top-left corner.
         left: Color,
-        /// The color at the top side.
+        /// The color of the top-right corner.
         top: Color,
-        /// The color at the bottom side.
+        /// The color of the bottom-left corner.
         bottom: Color,
-        /// The color at the right side.
+        /// The color of the bottom-right corner.
         right: Color,
     },
     /// Draw a circle outline.
