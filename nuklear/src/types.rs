@@ -100,12 +100,12 @@ impl Handle {
     }
     /// Read the handle as an integer id.
     pub fn as_id(&self) -> i32 {
-        // SAFETY: every constructor zeroes the union first, so all bytes are initialized.
+        // SAFETY: every public constructor zeroes the union first, and crate-private conversions accept only zeroed handles. All bytes are initialized.
         unsafe { self.0.id }
     }
     /// Read the handle as a raw pointer.
     pub fn as_ptr(&self) -> *mut c_void {
-        // SAFETY: every constructor zeroes the union first, so all bytes are initialized.
+        // SAFETY: every public constructor zeroes the union first, and crate-private conversions accept only zeroed handles. All bytes are initialized.
         unsafe { self.0.ptr }
     }
 }
@@ -142,8 +142,11 @@ impl Image {
     }
 }
 
-impl From<sys::nk_image> for Image {
-    fn from(v: sys::nk_image) -> Self {
+impl Image {
+    /// Make an image from a C image. The handle must come from C or from this crate, so the union is zeroed.
+    /// This function is not public: safe code could build a `sys::nk_handle` with uninitialized bytes.
+    #[allow(dead_code)] // Later tasks call this function.
+    pub(crate) fn from_sys(v: sys::nk_image) -> Image {
         Image { handle: Handle(v.handle), w: v.w, h: v.h, region: v.region }
     }
 }
@@ -448,6 +451,7 @@ mod tests {
     #[test] fn handle_id_and_ptr_read_back() { assert_eq!(Handle::id(7).as_id(), 7); assert!(Handle::id(0).as_ptr().is_null()); let p = 0x10usize as *mut std::ffi::c_void; assert_eq!(Handle::ptr(p).as_ptr(), p); }
     #[test] fn flags_or_and_contains() { let f = PanelFlags::BORDER | PanelFlags::TITLE; assert!(f.contains(PanelFlags::TITLE)); assert!(!f.contains(PanelFlags::MOVABLE)); assert_eq!(f.bits(), sys::NK_WINDOW_BORDER as u32 | sys::NK_WINDOW_TITLE as u32); }
     #[test] fn enum_values_match_sys() { assert_eq!(Key::Enter.raw(), sys::NK_KEY_ENTER as u32); assert_eq!(Symbol::Hamburger.raw(), sys::NK_SYMBOL_HAMBURGER as u32); assert_eq!(VertexFormat::Rgba32.raw(), sys::NK_FORMAT_RGBA32 as u32); }
+    #[test] fn image_roundtrip_through_sys() { let i = Image::new(Handle::id(9), 4, 5); let back = Image::from_sys(sys::nk_image::from(i)); assert_eq!(back, i); assert_eq!(back.handle.as_id(), 9); assert_eq!(back.region, [0, 0, 4, 5]); }
     #[test] fn cstr_truncates_at_nul() { assert_eq!(crate::cstr("ab\0cd").as_bytes(), b"ab"); }
     #[test] fn from_bits_drops_private_bits() { assert_eq!(PanelFlags::from_bits(1 << 12), PanelFlags::empty()); }
 }
