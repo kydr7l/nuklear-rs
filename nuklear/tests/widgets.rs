@@ -184,3 +184,30 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
     });
     ctx.clear();
 }
+// Nuklear formats the value into a 64 byte buffer. A value of 2^31 or more overflows it.
+#[test] fn float_property_rejects_huge_values() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    ctx.window("w", WIN, PanelFlags::empty(), |w| {
+        w.layout_row_dynamic(30.0, 1);
+        for big in [3e9f32, -3e9] {
+            let mut v = 1.0f32;
+            assert!(!w.property_f32("a", 0.0, &mut v, big.abs(), 1.0, 1.0));
+            assert!(!w.property_f32("b", -big.abs(), &mut v, 10.0, 1.0, 1.0));
+            assert_eq!(v, 1.0);
+            let mut v = big;
+            assert!(!w.property_f32("c", -1e10, &mut v, 1e10, 1.0, 1.0));
+            assert_eq!(v, big);
+        }
+        for big in [3e9f64, -3e9] {
+            let mut v = 1.0f64;
+            assert!(!w.property_f64("d", 0.0, &mut v, big.abs(), 1.0, 1.0));
+            assert!(!w.property_f64("e", -big.abs(), &mut v, 10.0, 1.0, 1.0));
+            assert_eq!(v, 1.0);
+            let mut v = big;
+            assert!(!w.property_f64("f", -1e10, &mut v, 1e10, 1.0, 1.0));
+            assert_eq!(v, big);
+        }
+    });
+    ctx.clear();
+}

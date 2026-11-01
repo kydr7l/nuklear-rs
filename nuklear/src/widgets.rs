@@ -5,6 +5,10 @@
 
 use crate::{cstr, sys, text_arg, ButtonBehavior, ChartType, Color, ColorFormat, Colorf, Heading, Image, Symbol, TextAlign, Window};
 
+/// The largest absolute value of a float property, exclusive. `nk_dtoa` casts the value to `int` and
+/// writes past its 64 byte buffer when the cast is out of range. NaN fails the `<` test too.
+const PROPERTY_LIMIT: f32 = 2_147_483_648.0;
+
 impl<'a, 'f> Window<'a, 'f> {
     /// Show a text label.
     pub fn label(&mut self, text: &str, align: TextAlign) {
@@ -212,9 +216,11 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a `f32` property. The method returns `true` when the user changed `value`.
-    /// The method does nothing and returns `false` when `min > max`, or a number is not finite.
+    /// The method does nothing and returns `false` when `min > max`, a number is not finite,
+    /// or `min`, `max` or `value` has an absolute value of 2^31 or more.
     pub fn property_f32(&mut self, name: &str, min: f32, value: &mut f32, max: f32, step: f32, inc_per_pixel: f32) -> bool {
-        if min > max || ![min, *value, max, step, inc_per_pixel].iter().all(|v| v.is_finite()) {
+        let in_range = |v: f32| v.abs() < PROPERTY_LIMIT;
+        if min > max || ![step, inc_per_pixel].iter().all(|v| v.is_finite()) || !(in_range(min) && in_range(*value) && in_range(max)) {
             return false;
         }
         let name = cstr(name);
@@ -223,9 +229,11 @@ impl<'a, 'f> Window<'a, 'f> {
     }
 
     /// Show a `f64` property. The method returns `true` when the user changed `value`.
-    /// The method does nothing and returns `false` when `min > max`, or a number is not finite.
+    /// The method does nothing and returns `false` when `min > max`, a number is not finite,
+    /// or `min`, `max` or `value` has an absolute value of 2^31 or more.
     pub fn property_f64(&mut self, name: &str, min: f64, value: &mut f64, max: f64, step: f64, inc_per_pixel: f32) -> bool {
-        if min > max || ![min, *value, max, step].iter().all(|v| v.is_finite()) || !inc_per_pixel.is_finite() {
+        let in_range = |v: f64| v.abs() < f64::from(PROPERTY_LIMIT);
+        if min > max || !step.is_finite() || !inc_per_pixel.is_finite() || !(in_range(min) && in_range(*value) && in_range(max)) {
             return false;
         }
         let name = cstr(name);
