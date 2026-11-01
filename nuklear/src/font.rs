@@ -135,7 +135,8 @@ unsafe extern "C" fn query_cb(
 }
 
 /// The largest font height in pixels that the atlas accepts.
-/// stb_truetype turns the height into integer sizes and array indices. A larger value can overflow them.
+/// This bound keeps the C integer math safe. stb_truetype turns the height into integer sizes and array indices.
+/// The bound does not promise that the glyphs fit in the atlas image.
 const MAX_FONT_HEIGHT: f32 = 512.0;
 
 fn height_ok(height: f32) -> bool {
@@ -208,6 +209,10 @@ impl FontAtlasBuilder {
 
     /// Add the built-in font. The function returns `None` when `height` is not finite or not in `0 < height <= 512`.
     /// The height range protects the integer math in stb_truetype.
+    /// The atlas image is 512 pixels wide, or 1024 pixels wide when the atlas has more than 1000 glyphs.
+    /// The height of the image is at most 32768 pixels.
+    /// Nuklear leaves out the glyphs that do not fit, and it gives no error.
+    /// All fonts in one atlas share this space.
     pub fn add_default(&mut self, height: f32) -> Option<FontId> {
         if !height_ok(height) {
             return None;
@@ -223,11 +228,20 @@ impl FontAtlasBuilder {
     /// Add a font from TrueType or OpenType data. The atlas copies the bytes before the function returns.
     /// The function returns `None` when `height` is not finite or not in `0 < height <= 512`, or when `ttf` is empty.
     /// The height range protects the integer math in stb_truetype.
+    /// The atlas image is 512 pixels wide, or 1024 pixels wide when the atlas has more than 1000 glyphs.
+    /// The height of the image is at most 32768 pixels.
+    /// Nuklear leaves out the glyphs that do not fit, and it gives no error.
+    /// All fonts in one atlas share this space.
     ///
     /// # Safety
-    /// `ttf` must be a well-formed TrueType or OpenType file. stb_truetype reads out of bounds on malformed data.
+    /// `ttf` must be one complete, well-formed TrueType or OpenType file, or a collection. The atlas uses font 0 of a collection.
+    /// The tables and the font metrics in `ttf` must be valid.
+    /// stb_truetype trusts the offsets in the data. It does not check them against `ttf.len()`.
+    /// Bad data causes out-of-bounds reads when `bake` runs, not when this function runs.
+    /// For this reason this function is unsafe, and the later call to the safe `bake` is part of the contract.
     pub unsafe fn add_ttf(&mut self, ttf: &[u8], height: f32) -> Option<FontId> {
-        if !height_ok(height) {
+        // An empty `ttf` would reach `NK_ASSERT(size)` in Nuklear, which aborts.
+        if !height_ok(height) || ttf.is_empty() {
             return None;
         }
         // SAFETY: `atlas` is live. `ttf` is readable for its length, and Nuklear only reads it. The caller promises that the data is well formed.
@@ -244,6 +258,10 @@ impl FontAtlasBuilder {
     }
 
     /// Draw the glyphs into an image. The function returns `None` when no font was added or when Nuklear fails.
+    /// The atlas image is 512 pixels wide, or 1024 pixels wide when the atlas has more than 1000 glyphs.
+    /// The height of the image is at most 32768 pixels.
+    /// Nuklear leaves out the glyphs that do not fit, and it gives no error.
+    /// All fonts in one atlas share this space.
     pub fn bake(self, format: AtlasFormat) -> Option<BakedAtlas> {
         // Without a font, Nuklear adds a default font on its own. This crate wants an explicit font.
         if self.fonts.is_empty() {

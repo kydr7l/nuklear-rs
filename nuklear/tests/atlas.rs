@@ -44,6 +44,11 @@ use nuklear::*;
     }
     assert!(b.bake(AtlasFormat::Alpha8).is_none());
 }
+#[test] fn empty_ttf_is_rejected() {
+    let mut b = FontAtlasBuilder::new();
+    // SAFETY: the empty check fails first, so Nuklear never reads the bytes.
+    assert!(unsafe { b.add_ttf(&[], 13.0) }.is_none());
+}
 #[test] fn ttf_from_the_system_bakes() {
     let Ok(ttf) = std::fs::read("C:/Windows/Fonts/arial.ttf") else { return };
     let mut b = FontAtlasBuilder::new();
