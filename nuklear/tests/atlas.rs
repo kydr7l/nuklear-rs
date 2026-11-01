@@ -1,0 +1,55 @@
+use nuklear::*;
+
+#[test] fn default_font_bakes_and_drives_a_context() {
+    let mut b = FontAtlasBuilder::new();
+    let id = b.add_default(13.0).unwrap();
+    let baked = b.bake(AtlasFormat::Rgba32).unwrap();
+    assert!(baked.width() > 0 && baked.height() > 0);
+    assert_eq!(baked.pixels().len(), (baked.width() * baked.height() * 4) as usize);
+    let (atlas, null) = baked.end(Handle::id(7));
+    assert_eq!(null.texture.as_id(), 7);
+    let font = atlas.font(id).unwrap();
+    assert!(font.height() > 0.0);
+    let mut ctx = Context::new(&font).unwrap();
+    ctx.window("w", Rect { x: 0.0, y: 0.0, w: 100.0, h: 100.0 }, PanelFlags::TITLE, |w| { w.layout_row_dynamic(20.0, 1); w.label("x", TextAlign::LEFT); });
+    assert!(ctx.commands().any(|c| matches!(c, Command::Text { .. })));
+    ctx.clear();
+}
+#[test] fn empty_builder_bake_returns_none() {
+    assert!(FontAtlasBuilder::new().bake(AtlasFormat::Alpha8).is_none());
+}
+#[test] fn baked_atlas_drop_without_end_is_clean() {
+    let mut b = FontAtlasBuilder::new();
+    b.add_default(13.0).unwrap();
+    let baked = b.bake(AtlasFormat::Alpha8).unwrap();
+    assert_eq!(baked.pixels().len(), (baked.width() * baked.height()) as usize);
+    drop(baked);
+}
+#[test] fn font_id_from_another_atlas_is_none() {
+    let mut two = FontAtlasBuilder::new();
+    two.add_default(13.0).unwrap();
+    let second = two.add_default(14.0).unwrap();
+    let mut one = FontAtlasBuilder::new();
+    one.add_default(13.0).unwrap();
+    let (atlas, _) = one.bake(AtlasFormat::Alpha8).unwrap().end(Handle::id(1));
+    assert_eq!(atlas.len(), 1);
+    assert!(atlas.font(second).is_none());
+}
+#[test] fn height_outside_the_range_is_rejected() {
+    let mut b = FontAtlasBuilder::new();
+    for h in [0.0, -1.0, f32::NAN, f32::INFINITY, 512.5, 1.0e9] {
+        assert!(b.add_default(h).is_none(), "height {h}");
+        // SAFETY: the height check fails first, so Nuklear never reads the bytes.
+        assert!(unsafe { b.add_ttf(&[], h) }.is_none(), "height {h}");
+    }
+    assert!(b.bake(AtlasFormat::Alpha8).is_none());
+}
+#[test] fn ttf_from_the_system_bakes() {
+    let Ok(ttf) = std::fs::read("C:/Windows/Fonts/arial.ttf") else { return };
+    let mut b = FontAtlasBuilder::new();
+    // SAFETY: the file is a well-formed TrueType font that ships with Windows.
+    let id = unsafe { b.add_ttf(&ttf, 16.0) }.unwrap();
+    drop(ttf); // The atlas copies the bytes.
+    let (atlas, _) = b.bake(AtlasFormat::Alpha8).unwrap().end(Handle::id(1));
+    assert_eq!(atlas.font(id).unwrap().height(), 16.0);
+}
