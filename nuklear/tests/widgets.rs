@@ -115,7 +115,6 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
     });
     ctx.clear();
 }
-// Task 7 must add the popup-sequence regression test: Static popup "p", then `tooltip`, then a second `popup`.
 #[test] fn tooltip_runs_after_a_row() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();

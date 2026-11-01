@@ -357,7 +357,6 @@ sys_enum! {
 
 impl CollapseState {
     /// Make a state from a C value. A non-zero value gives `Maximized`.
-    #[allow(dead_code)] // Later tasks call this function.
     pub(crate) fn from_raw(v: u32) -> CollapseState {
         if v != 0 {
             CollapseState::Maximized

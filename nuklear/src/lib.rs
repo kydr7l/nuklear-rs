@@ -21,6 +21,9 @@ pub use command::*;
 
 mod widgets;
 
+pub mod containers;
+pub use containers::*;
+
 /// Make a C string from `s`. The function stops at the first NUL byte.
 pub(crate) fn cstr(s: &str) -> std::ffi::CString {
     let end = s.find('\0').unwrap_or(s.len());

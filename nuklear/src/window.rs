@@ -71,7 +71,7 @@ const MAX_TEMPLATE_COLUMNS: u8 = sys::NK_MAX_LAYOUT_ROW_TEMPLATE_COLUMNS as u8;
 /// Layout methods.
 impl Window<'_, '_> {
     /// Get the C panel of the current window.
-    fn panel(&self) -> *mut sys::nk_panel {
+    pub(crate) fn panel(&self) -> *mut sys::nk_panel {
         // SAFETY: a `Window` exists only inside a window body. There `current` and its `layout` are not null.
         unsafe { (*(*self.ctx.raw_const()).current).layout }
     }

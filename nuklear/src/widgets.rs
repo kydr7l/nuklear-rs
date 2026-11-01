@@ -259,20 +259,28 @@ impl<'a, 'f> Window<'a, 'f> {
             return;
         }
         let text = cstr(text);
+        // SAFETY: the context is valid, a window is open, and `text` ends with NUL.
+        self.keep_panel_type(|ctx| unsafe { sys::nk_tooltip(ctx, text.as_ptr()) });
+    }
+
+    /// Run `call` with the C context. Then undo a change of the parent panel type.
+    ///
+    /// When the tooltip popup fails to open, `nk_tooltip_begin` writes the tooltip type into the parent panel.
+    /// Then a later popup asserts. This method restores the old panel type and the old popup type.
+    pub(crate) fn keep_panel_type<R>(&mut self, call: impl FnOnce(*mut sys::nk_context) -> R) -> R {
         let ctx = self.raw();
         // SAFETY: a `Window` exists only inside a window body. There `current` and its `layout` are not null.
         let (win, layout) = unsafe { ((*ctx).current, (*(*ctx).current).layout) };
         // SAFETY: `win` and `layout` are valid, see above.
         let (layout_type, popup_type) = unsafe { ((*layout).type_, (*win).popup.type_) };
-        // SAFETY: the context is valid, a window is open, and `text` ends with NUL.
-        unsafe { sys::nk_tooltip(ctx, text.as_ptr()) };
+        let r = call(ctx);
         // SAFETY: the window and its panel still exist after the call.
         unsafe {
-            // When the tooltip popup fails to open, Nuklear writes the tooltip type into the parent panel. Restore the old types.
             if (*layout).type_ != layout_type {
                 (*layout).type_ = layout_type;
                 (*win).popup.type_ = popup_type;
             }
         }
+        r
     }
 }

@@ -25,7 +25,6 @@ pub(crate) struct PanelState {
     /// The number of columns pushed to the current row template.
     pub template_cols: u8,
     /// This flag is `true` after the first layout call. The menubar checks it.
-    #[allow(dead_code)] // The menubar reads this field.
     pub layout_started: bool,
 }
 
