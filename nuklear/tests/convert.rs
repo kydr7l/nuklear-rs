@@ -1,0 +1,103 @@
+mod common;
+use nuklear::*;
+
+fn layout() -> VertexLayout {
+    VertexLayout::new(20, 4, &[(VertexAttribute::Position, VertexFormat::Float, 0), (VertexAttribute::Texcoord, VertexFormat::Float, 8), (VertexAttribute::Color, VertexFormat::R8G8B8A8, 16)]).unwrap()
+}
+
+#[test] fn convert_fills_buffers_consistently() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    ctx.window("w", Rect { x: 0.0, y: 0.0, w: 200.0, h: 200.0 }, PanelFlags::TITLE | PanelFlags::BORDER, |w| { w.layout_row_dynamic(30.0, 1); w.label("hello", TextAlign::LEFT); w.button_label("b"); });
+    let layout = layout();
+    let null = NullTexture { texture: Handle::id(1), uv: Vec2 { x: 0.5, y: 0.5 } };
+    let cfg = ConvertConfig::new(&layout, null);
+    let (mut cmds, mut verts, mut elems) = (Buffer::new(), Buffer::new(), Buffer::new());
+    let total: u32 = ctx.convert(&mut cmds, &mut verts, &mut elems, &cfg).unwrap().map(|d| d.elem_count).sum();
+    assert!(total > 0);
+    assert_eq!(total as usize, elems.as_indices().len());
+    assert!(verts.len() > 0 && verts.len() % 20 == 0);
+    let max_index = *elems.as_indices().iter().max().unwrap() as usize;
+    assert!(max_index < verts.len() / 20);
+    ctx.clear();
+}
+#[test] fn vertex_layout_rejects_bad_elements() {
+    assert_eq!(VertexLayout::new(0, 4, &[]).unwrap_err(), LayoutError::ZeroSize);
+    assert_eq!(VertexLayout::new(20, 3, &[]).unwrap_err(), LayoutError::BadAlignment);
+    assert_eq!(VertexLayout::new(20, 4, &[(VertexAttribute::Position, VertexFormat::Float, 16)]).unwrap_err(), LayoutError::OutOfBounds { attribute: VertexAttribute::Position, offset: 16 });
+    assert_eq!(VertexLayout::new(20, 4, &[(VertexAttribute::Color, VertexFormat::Float, 0)]).unwrap_err(), LayoutError::FormatMismatch { attribute: VertexAttribute::Color, format: VertexFormat::Float });
+    assert_eq!(VertexLayout::new(20, 4, &[(VertexAttribute::Position, VertexFormat::Rgba32, 0)]).unwrap_err(), LayoutError::FormatMismatch { attribute: VertexAttribute::Position, format: VertexFormat::Rgba32 });
+    assert_eq!(VertexLayout::new(20, 4, &[(VertexAttribute::Position, VertexFormat::Float, usize::MAX)]).unwrap_err(), LayoutError::OutOfBounds { attribute: VertexAttribute::Position, offset: usize::MAX });
+    assert!(VertexLayout::new(16, 4, &[(VertexAttribute::Position, VertexFormat::Float, 8)]).is_ok());
+}
+#[test] fn empty_buffer_slices_are_empty() {
+    let b = Buffer::new();
+    assert!(b.as_bytes().is_empty());
+    assert!(b.as_indices().is_empty());
+    assert!(b.is_empty());
+}
+#[test] fn convert_on_empty_frame_yields_no_draw_commands() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    let layout = layout();
+    let cfg = ConvertConfig::new(&layout, NullTexture { texture: Handle::id(1), uv: Vec2::default() });
+    let (mut cmds, mut verts, mut elems) = (Buffer::new(), Buffer::new(), Buffer::new());
+    let n = ctx.convert(&mut cmds, &mut verts, &mut elems, &cfg).unwrap().count();
+    assert_eq!(n, 0);
+    ctx.clear();
+}
+
+// The tests below cover the rulings and the C facts that the brief does not list.
+
+#[test] fn r8g8b8_needs_the_four_bytes_that_nuklear_writes() {
+    assert_eq!(VertexFormat::R8G8B8.size(), 4);
+    assert_eq!(VertexLayout::new(3, 1, &[(VertexAttribute::Color, VertexFormat::R8G8B8, 0)]).unwrap_err(), LayoutError::OutOfBounds { attribute: VertexAttribute::Color, offset: 0 });
+    assert!(VertexLayout::new(4, 1, &[(VertexAttribute::Color, VertexFormat::R8G8B8, 0)]).is_ok());
+    assert_eq!(VertexLayout::new(15, 1, &[(VertexAttribute::Position, VertexFormat::Double, 0)]).unwrap_err(), LayoutError::OutOfBounds { attribute: VertexAttribute::Position, offset: 0 });
+}
+#[test] fn vertex_layout_rejects_large_values_and_many_elements() {
+    assert_eq!(VertexLayout::new(1025, 4, &[]).unwrap_err(), LayoutError::TooLarge);
+    assert_eq!(VertexLayout::new(1024, 2048, &[]).unwrap_err(), LayoutError::TooLarge);
+    assert!(VertexLayout::new(1024, 1024, &[]).is_ok());
+    // TooLarge comes before TooManyElements and before the element checks.
+    assert_eq!(VertexLayout::new(4096, 4, &[(VertexAttribute::Position, VertexFormat::Float, 9999); 17]).unwrap_err(), LayoutError::TooLarge);
+    assert_eq!(VertexLayout::new(20, 4, &[(VertexAttribute::Position, VertexFormat::Float, 0); 17]).unwrap_err(), LayoutError::TooManyElements);
+    assert!(VertexLayout::new(20, 4, &[(VertexAttribute::Position, VertexFormat::Float, 0); 16]).is_ok());
+}
+#[test] fn convert_rejects_segment_counts_that_never_end() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    let layout = layout();
+    let mut cfg = ConvertConfig::new(&layout, NullTexture { texture: Handle::id(1), uv: Vec2::default() });
+    cfg.arc_segment_count = u32::MAX;
+    let (mut cmds, mut verts, mut elems) = (Buffer::new(), Buffer::new(), Buffer::new());
+    assert!(ctx.convert(&mut cmds, &mut verts, &mut elems, &cfg).is_err());
+    ctx.clear();
+}
+#[test] fn convert_twice_restarts_the_buffers() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    ctx.window("w", Rect { x: 0.0, y: 0.0, w: 200.0, h: 200.0 }, PanelFlags::BORDER, |w| { w.layout_row_dynamic(30.0, 1); w.button_label("b"); });
+    let layout = layout();
+    let cfg = ConvertConfig::new(&layout, NullTexture { texture: Handle::id(1), uv: Vec2::default() });
+    let (mut cmds, mut verts, mut elems) = (Buffer::new(), Buffer::new(), Buffer::new());
+    let first = ctx.convert(&mut cmds, &mut verts, &mut elems, &cfg).unwrap().count();
+    let (v, e) = (verts.len(), elems.len());
+    let second = ctx.convert(&mut cmds, &mut verts, &mut elems, &cfg).unwrap().count();
+    assert_eq!((first, v, e), (second, verts.len(), elems.len()));
+    // The window is dropped, because convert ended the frame build.
+    assert!(ctx.window("x", Rect { x: 0.0, y: 0.0, w: 50.0, h: 50.0 }, PanelFlags::BORDER, |_| ()).is_none());
+    ctx.clear();
+}
+#[test] fn large_alignment_converts_without_overflow() {
+    let font = UserFont::new(common::FixedFont);
+    let mut ctx = Context::new(&font).unwrap();
+    ctx.window("w", Rect { x: 0.0, y: 0.0, w: 300.0, h: 300.0 }, PanelFlags::TITLE | PanelFlags::BORDER, |w| { w.layout_row_dynamic(30.0, 1); for _ in 0..5 { w.button_label("b"); } });
+    let layout = VertexLayout::new(1000, 1024, &[(VertexAttribute::Position, VertexFormat::Float, 0), (VertexAttribute::Color, VertexFormat::R8G8B8, 996)]).unwrap();
+    let cfg = ConvertConfig::new(&layout, NullTexture { texture: Handle::id(1), uv: Vec2::default() });
+    let (mut cmds, mut verts, mut elems) = (Buffer::new(), Buffer::new(), Buffer::new());
+    let total: u32 = ctx.convert(&mut cmds, &mut verts, &mut elems, &cfg).unwrap().map(|d| d.elem_count).sum();
+    assert_eq!(total as usize, elems.as_indices().len());
+    assert!(verts.as_bytes().len() >= 1000);
+    ctx.clear();
+}
