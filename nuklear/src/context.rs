@@ -209,9 +209,15 @@ impl<'f> Context<'f> {
         unsafe { sys::nk_window_set_size(self.raw(), name.as_ptr(), size.into()) }
     }
 
-    /// Give the focus to the window `name`.
+    /// Give the focus to the window `name`. The method does nothing when the window does not exist.
     pub fn window_set_focus(&mut self, name: &str) {
         let name = cstr(name);
+        // SAFETY: the context is valid, and `name` ends with NUL.
+        let found = unsafe { sys::nk_window_find(self.raw_const(), name.as_ptr()) };
+        // For an unknown name, `nk_window_set_focus` sets the active window to NULL. That breaks the window list at the next frame.
+        if found.is_null() {
+            return;
+        }
         // SAFETY: the context is valid, and `name` ends with NUL.
         unsafe { sys::nk_window_set_focus(self.raw(), name.as_ptr()) }
     }
@@ -219,7 +225,8 @@ impl<'f> Context<'f> {
     /// Close the window `name`.
     pub fn window_close(&mut self, name: &str) {
         let name = cstr(name);
-        // SAFETY: the context is valid, and `name` ends with NUL. No window is current, because this method borrows the context.
+        // SAFETY: the context is valid, and `name` ends with NUL. Normally no window is current, because `nk_end` always runs.
+        // After a caught panic in a window body, the stale current window can hit `NK_ASSERT(ctx->current != win)`. That aborts and is not UB.
         unsafe { sys::nk_window_close(self.raw(), name.as_ptr()) }
     }
 
