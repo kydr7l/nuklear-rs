@@ -58,6 +58,8 @@ pub struct Context<'f> {
     pub(crate) panel: PanelState,
     /// Ratio arrays for `layout_row`. Nuklear keeps a pointer into each array until the window ends.
     pub(crate) ratios: Vec<Box<[f32]>>,
+    /// This flag is `true` after `commands`. `nk_build` links the end of the command list to the used memory, so a new window would break the next walk.
+    pub(crate) frame_built: bool,
     _font: PhantomData<&'f sys::nk_user_font>,
 }
 
@@ -78,6 +80,7 @@ impl<'f> Context<'f> {
             popup_depth: 0,
             panel: PanelState::default(),
             ratios: Vec::new(),
+            frame_built: false,
             _font: PhantomData,
         })
     }
@@ -141,6 +144,7 @@ impl<'f> Context<'f> {
     }
 
     /// Make a window. The function runs `f` only when the window is open and visible.
+    /// After `commands` and before `clear`, the function returns `None` and does not call Nuklear.
     /// The function returns the value of `f`, or `None` when it did not run `f`.
     pub fn window_titled<R>(
         &mut self,
@@ -150,6 +154,9 @@ impl<'f> Context<'f> {
         flags: PanelFlags,
         f: impl FnOnce(&mut Window<'_, 'f>) -> R,
     ) -> Option<R> {
+        if self.frame_built {
+            return None;
+        }
         let (name, title) = (cstr(name), cstr(title));
         // SAFETY: the context is valid, and both strings end with NUL. Nuklear copies the strings.
         let open = unsafe { sys::nk_begin_titled(self.raw(), name.as_ptr(), title.as_ptr(), bounds.into(), flags.bits()) };
@@ -166,6 +173,7 @@ impl<'f> Context<'f> {
         // SAFETY: the context is valid.
         unsafe { sys::nk_clear(self.raw()) };
         self.ratios.clear();
+        self.frame_built = false;
     }
 
     /// Check if the window `name` is closed. The method returns `true` when the window does not exist.

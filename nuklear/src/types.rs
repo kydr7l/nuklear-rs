@@ -35,6 +35,11 @@ pub struct Vec2i {
     pub y: i16,
 }
 convert!(Vec2i, nk_vec2i { x, y });
+// The command iterator casts `nk_vec2i` arrays to `Vec2i` slices, so the layouts must match.
+const _: () = {
+    assert!(std::mem::size_of::<Vec2i>() == std::mem::size_of::<sys::nk_vec2i>());
+    assert!(std::mem::align_of::<Vec2i>() == std::mem::align_of::<sys::nk_vec2i>());
+};
 
 /// A rectangle with a position and a size.
 #[repr(C)]
@@ -145,7 +150,6 @@ impl Image {
 impl Image {
     /// Make an image from a C image. The handle must come from C or from this crate, so the union is zeroed.
     /// This function is not public: safe code could build a `sys::nk_handle` with uninitialized bytes.
-    #[allow(dead_code)] // Later tasks call this function.
     pub(crate) fn from_sys(v: sys::nk_image) -> Image {
         Image { handle: Handle(v.handle), w: v.w, h: v.h, region: v.region }
     }

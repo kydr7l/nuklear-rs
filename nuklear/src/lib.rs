@@ -16,6 +16,9 @@ pub use context::*;
 pub mod window;
 pub use window::*;
 
+pub mod command;
+pub use command::*;
+
 mod widgets;
 
 /// Make a C string from `s`. The function stops at the first NUL byte.
