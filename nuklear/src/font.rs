@@ -356,6 +356,20 @@ impl Drop for BakedAtlas {
 }
 
 /// A finished atlas. It owns the fonts. `BakedFont` borrows from it.
+///
+/// The atlas must live longer than every context that uses one of its fonts.
+/// This code does not compile, because it drops the atlas before the last use of the context:
+///
+/// ```compile_fail,E0505
+/// use nuklear::*;
+/// let mut b = FontAtlasBuilder::new();
+/// let id = b.add_default(13.0).unwrap();
+/// let (atlas, _) = b.bake(AtlasFormat::Alpha8).unwrap().end(Handle::id(1));
+/// let font = atlas.font(id).unwrap();
+/// let mut ctx = Context::new(&font).unwrap();
+/// drop(atlas);
+/// ctx.clear();
+/// ```
 pub struct FontAtlas {
     /// This pointer comes from `Box::into_raw`. The fonts point back into the allocation.
     atlas: NonNull<sys::nk_font_atlas>,

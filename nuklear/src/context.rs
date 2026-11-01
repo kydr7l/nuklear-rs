@@ -106,7 +106,26 @@ impl<'f> Context<'f> {
         r
     }
 
-    /// Change the font of the context.
+    /// Change the font of the context. The new font must live longer than the context.
+    /// This code does not compile, because the new font ends before the last use of the context:
+    ///
+    /// ```compile_fail,E0597
+    /// use nuklear::*;
+    /// struct F;
+    /// impl Font for F {
+    ///     fn height(&self) -> f32 { 12.0 }
+    ///     fn width(&self, _h: f32, _t: &str) -> f32 { 0.0 }
+    ///     fn glyph(&self, _h: f32, _c: char, _n: char) -> Glyph { Glyph::default() }
+    ///     fn texture(&self) -> Handle { Handle::id(1) }
+    /// }
+    /// let first = UserFont::new(F);
+    /// let mut ctx = Context::new(&first).unwrap();
+    /// {
+    ///     let second = UserFont::new(F);
+    ///     ctx.set_font(&second);
+    /// }
+    /// ctx.clear();
+    /// ```
     pub fn set_font<F: FontHandle>(&mut self, font: &'f F) {
         // SAFETY: the context is valid. The font pointer stays valid for `'f`, and `'f` outlives the context.
         unsafe { sys::nk_style_set_font(self.raw(), font.raw()) }
