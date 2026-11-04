@@ -25,6 +25,12 @@ The headless example runs one frame, prints every draw command, and converts the
 cargo run -p nuklear --example headless
 ```
 
+The demo example opens a window with an overview of the widgets. It uses `winit` and `softbuffer` (dev-dependencies) and needs no GPU.
+
+```
+cargo run -p nuklear --release --example demo
+```
+
 Run the checks with this command.
 
 ```
@@ -71,7 +77,7 @@ These parts of Nuklear are excluded on purpose.
 - The "value return" variants of knobs and sliders (the `&mut` forms are included).
 - Window cursors.
 - `nk_widget` manual layout.
-- Any render backend and any example with a window.
+- Any render backend. The `demo` example draws with a small CPU rasterizer that lives in the example file, not in the crates.
 
 ## License
 
