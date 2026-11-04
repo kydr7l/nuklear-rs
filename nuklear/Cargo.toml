@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.82"
 description = "Safe Rust wrapper for the Nuklear immediate mode GUI library."
 license = "MIT OR Apache-2.0"
-repository = ""
+repository = "https://github.com/kydr7l/nuklear-rs"
 
 [dependencies]
 nuklear-sys = { path = "../nuklear-sys", version = "0.1.0" }

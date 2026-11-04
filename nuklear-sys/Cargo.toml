@@ -6,7 +6,7 @@ rust-version = "1.82"
 links = "nuklear"
 description = "Raw FFI bindings to the Nuklear immediate mode GUI library."
 license = "MIT OR Apache-2.0"
-repository = ""
+repository = "https://github.com/kydr7l/nuklear-rs"
 
 [build-dependencies]
 bindgen = "0.72"
