@@ -5,6 +5,9 @@
 //! and it reads the result as draw commands (`Context::commands`) or as vertex data (`Context::convert`).
 //! The popups, combo boxes, contextual menus, menus and charts are in the module `containers`, not in `window`. The crate root re-exports every public type.
 //!
+//! For a custom widget, take a slot with `Window::widget`, read the input with `Window::input_state`, and draw with `Window::canvas`.
+//! Read and change the theme with `Context::style_mut` or `Window::style_mut`.
+//!
 //! # The frame protocol
 //!
 //! Make one `UserFont` and one `Context` that borrows the font. Then repeat these steps for each frame.
@@ -70,7 +73,13 @@
 //!   The wrapper returns early instead of a call that would fail a Nuklear assertion.
 //! - **Numbers.** Sliders, knobs, progress bars and properties return `false` and do not call C when a parameter is not finite
 //!   or when a step or a range is not valid.
-//! - **Threads.** `Context`, `Window`, `Buffer`, `TextEdit` and the atlas types hold raw pointers. They are not `Send` and not `Sync`.
+//! - **Canvas.** `Canvas` borrows the window, so no widget runs while it draws. Each canvas method checks that the C casts of its numbers
+//!   to `short` and `unsigned short` are defined. It draws nothing when a check fails.
+//! - **Style.** The style types give no access to the font, the cursors, the `userdata` handles and the draw callbacks of the C structs.
+//!   `Style` has no `Clone`, because it holds the font pointer of its context. A setter of an `f32` or a `Vec2` value ignores a value
+//!   that is not finite, is negative, or is 65536 or more, because Nuklear casts style values to integers when it draws.
+//! - **Input state.** `InputState` borrows the context, so no input event changes it while it lives.
+//! - **Threads.** `Context`, `Window`, `Buffer`, `TextEdit`, `Canvas` and the atlas types hold raw pointers. They are not `Send` and not `Sync`.
 //!
 //! # Aborts
 //!
@@ -108,6 +117,7 @@
 //! - A Nuklear assertion aborts the process and prints the expression.
 //! - A panic in a scope body aborts the process.
 //! - The `_text` functions get at most the first 2^30 bytes of a string. The cut can split a UTF-8 character.
+//! - The style types give no access to `nk_style_link`, the header alignment, the tooltip origin and the nine-slice style items.
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![deny(missing_docs)]
 
@@ -127,6 +137,15 @@ pub use window::*;
 
 pub mod command;
 pub use command::*;
+
+pub mod canvas;
+pub use canvas::*;
+
+pub mod input;
+pub use input::*;
+
+pub mod style;
+pub use style::*;
 
 mod widgets;
 

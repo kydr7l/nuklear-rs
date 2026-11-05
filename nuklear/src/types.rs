@@ -86,6 +86,41 @@ pub struct Colorf {
 }
 convert!(Colorf, nk_colorf { r, g, b, a });
 
+/// Clamp a color channel to the range 0 to 1. NaN becomes 0.
+/// `nk_hsva_colorf` casts `6 * h` to `int`, which is undefined behaviour for a value out of the `int` range.
+fn unit(v: f32) -> f32 {
+    if v.is_nan() {
+        0.0
+    } else {
+        v.clamp(0.0, 1.0)
+    }
+}
+
+impl Colorf {
+    /// Get the color as `[hue, saturation, value, alpha]`. Each value is in the range 0 to 1 for a color in that range.
+    pub fn to_hsva(self) -> [f32; 4] {
+        let mut hsva = [0.0; 4];
+        // SAFETY: `hsva` has room for the four floats that Nuklear writes. The function does only float math.
+        unsafe { sys::nk_colorf_hsva_fv(hsva.as_mut_ptr(), self.into()) };
+        hsva
+    }
+
+    /// Make a color from `[hue, saturation, value, alpha]`. The function clamps each value to the range 0 to 1.
+    pub fn from_hsva(hsva: [f32; 4]) -> Colorf {
+        let hsva = hsva.map(unit);
+        // SAFETY: `hsva` holds the four floats that Nuklear reads, and each one is in the range 0 to 1.
+        unsafe { sys::nk_hsva_colorfv(hsva.as_ptr()) }.into()
+    }
+}
+
+impl Color {
+    /// Make an opaque color from hue, saturation and value. The function clamps each value to the range 0 to 1.
+    pub fn from_hsv(h: f32, s: f32, v: f32) -> Color {
+        // SAFETY: the function does only float math on values in the range 0 to 1.
+        unsafe { sys::nk_hsv_f(unit(h), unit(s), unit(v)) }.into()
+    }
+}
+
 /// An opaque user handle. It holds an integer id or a raw pointer.
 #[derive(Clone, Copy, Default)]
 pub struct Handle(pub(crate) sys::nk_handle);
@@ -301,9 +336,23 @@ macro_rules! sys_enum {
             )+
         }
         impl $name {
+            #[allow(dead_code)] // `WidgetState` only reads values back from C.
             pub(crate) fn raw(self) -> u32 { self as u32 }
+            /// Make a value from a C value. The function returns `None` when no variant has the value.
+            #[allow(dead_code)] // Not every enum reads values back from C.
+            pub(crate) fn try_from_raw(v: u32) -> Option<Self> {
+                $(if v == sys::$c as u32 { return Some(Self::$v); })+
+                None
+            }
         }
     };
+}
+
+sys_enum! {
+    /// The state of the space that `Window::widget` gives to a custom widget.
+    WidgetState {
+        Invalid = NK_WIDGET_INVALID, Valid = NK_WIDGET_VALID, Rom = NK_WIDGET_ROM, Disabled = NK_WIDGET_DISABLED,
+    }
 }
 
 sys_enum! {
@@ -487,4 +536,7 @@ mod tests {
     #[test] fn image_roundtrip_through_sys() { let i = Image::new(Handle::id(9), 4, 5); let back = Image::from_sys(sys::nk_image::from(i)); assert_eq!(back, i); assert_eq!(back.handle.as_id(), 9); assert_eq!(back.region, [0, 0, 4, 5]); }
     #[test] fn cstr_truncates_at_nul() { assert_eq!(crate::cstr("ab\0cd").as_bytes(), b"ab"); }
     #[test] fn from_bits_drops_private_bits() { assert_eq!(PanelFlags::from_bits(1 << 12), PanelFlags::empty()); }
+    #[test] fn hsva_round_trip() { let c = Colorf { r: 1.0, g: 0.5, b: 0.0, a: 0.25 }; let back = Colorf::from_hsva(c.to_hsva()); for (x, y) in [(back.r, c.r), (back.g, c.g), (back.b, c.b), (back.a, c.a)] { assert!((x - y).abs() < 1e-4); } }
+    #[test] fn hsv_clamps_bad_values() { assert_eq!(Color::from_hsv(f32::NAN, 2.0, 1.0), Color::from_hsv(0.0, 1.0, 1.0)); assert_eq!(Colorf::from_hsva([1e30, 0.0, 0.0, f32::NAN]), Colorf::from_hsva([1.0, 0.0, 0.0, 0.0])); }
+    #[test] fn widget_state_from_raw() { assert_eq!(WidgetState::try_from_raw(sys::NK_WIDGET_ROM as u32), Some(WidgetState::Rom)); assert_eq!(WidgetState::try_from_raw(99), None); }
 }

@@ -1,6 +1,6 @@
 //! The Nuklear context, the input scope and the window scope.
 
-use crate::{cstr, sys, Button, CollapseState, Color, FontHandle, Key, PanelFlags, Rect, ShowState, Vec2, Window};
+use crate::{cstr, sys, text_arg, Button, CollapseState, Color, FontHandle, Key, PanelFlags, Rect, ShowState, Vec2, Window};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -352,6 +352,23 @@ impl<'f> Context<'f> {
     pub fn item_is_any_active(&self) -> bool {
         // SAFETY: the context is valid.
         unsafe { sys::nk_item_is_any_active(self.raw_const()) }
+    }
+
+    /// Get the width of `text` in the font of the context. The method uses only the first 2^30 bytes of the text.
+    pub fn text_width(&self, text: &str) -> f32 {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, and the font is not null and lives for `'f`, see `font_height`.
+        // `ptr` points to `len` readable bytes. The width callback is the one that the font set.
+        unsafe {
+            let font = (*self.raw_const()).style.font;
+            (*font).width.map_or(0.0, |width| width((*font).userdata, (*font).height, ptr, len))
+        }
+    }
+
+    /// Get the height of the font of the context.
+    pub fn font_height(&self) -> f32 {
+        // SAFETY: the context is valid. `new` and `set_font` set the font from a reference that lives for `'f`, so it is not null.
+        unsafe { (*(*self.raw_const()).style.font).height }
     }
 }
 

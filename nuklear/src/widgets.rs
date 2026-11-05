@@ -3,7 +3,8 @@
 //! Every text method passes the pointer and the length of the Rust string to a Nuklear `_text` function.
 //! None of these functions reads the string up to a NUL byte.
 
-use crate::{cstr, EditEvents, EditFlags, Filter, TextEdit, sys, text_arg, ButtonBehavior, ChartType, Color, ColorFormat, Colorf, Heading, Image, Symbol, TextAlign, Window};
+use crate::{cstr, EditEvents, EditFlags, Filter, StyleButton, TextEdit, sys, text_arg, ButtonBehavior, ChartType, Color, ColorFormat, Colorf, Heading, Image, Symbol, TextAlign, Window};
+use std::ffi::c_int;
 
 /// The largest absolute value of a float property, exclusive. `nk_dtoa` casts the value to `int` and
 /// writes past its 64 byte buffer when the cast is out of range. NaN fails the `<` test too.
@@ -15,6 +16,43 @@ impl<'a, 'f> Window<'a, 'f> {
         // SAFETY: the context is valid, a window is open, and the pointer comes from the unique `TextEdit`.
         let r = unsafe { sys::nk_edit_buffer(self.raw(), flags.bits(), edit.raw(), filter.raw()) };
         EditEvents::from_bits(r)
+    }
+
+    /// Show a text edit widget that edits `text` in place. The text holds at most `max` bytes.
+    /// Nuklear keeps the cursor and the selection of the active field in the window, so `text` can be a new `String` each frame.
+    /// The method cuts a longer `text` at a character boundary, and it limits `max` to 2^30.
+    /// The widget drops the characters that `filter` rejects.
+    pub fn edit_string(&mut self, flags: EditFlags, text: &mut String, max: usize, filter: Filter) -> EditEvents {
+        let max = max.min(crate::TEXT_LIMIT);
+        let mut n = text.len().min(max);
+        while !text.is_char_boundary(n) {
+            n -= 1;
+        }
+        // `nk_edit_string` keeps the text at most `max - 1` bytes long, so the buffer has one more byte.
+        let mut buf = vec![0u8; max + 1];
+        buf[..n].copy_from_slice(&text.as_bytes()[..n]);
+        let mut len = n as c_int;
+        // SAFETY: the context is valid, a window is open, and `buf` is writable for `max + 1` bytes, which fits in an `int`.
+        // `len` is at most `max`. Nuklear uses the buffer only during the call, as a fixed string that it does not grow.
+        let r = unsafe { sys::nk_edit_string(self.raw(), flags.bits(), buf.as_mut_ptr().cast(), &mut len, (max + 1) as c_int, filter.raw()) };
+        let len = usize::try_from(len).unwrap_or(0).min(max);
+        *text = String::from_utf8_lossy(&buf[..len]).into_owned();
+        EditEvents::from_bits(r)
+    }
+
+    /// Show a horizontal line that fills the next widget slot. With `rounding`, the line has round ends.
+    pub fn rule_horizontal(&mut self, color: Color, rounding: bool) {
+        // SAFETY: the context is valid, and a window is open.
+        unsafe { sys::nk_rule_horizontal(self.raw(), color.into(), rounding) }
+    }
+
+    /// Show a button with a text and its own style. The method returns `true` when the user clicks the button.
+    /// Copy `Style::button` and change the copy to make `style`.
+    /// The method uses only the first 2^30 bytes of the text.
+    pub fn button_label_styled(&mut self, style: &StyleButton, text: &str) -> bool {
+        let (ptr, len) = text_arg(text);
+        // SAFETY: the context is valid, a window is open, `style` is a complete style that lives for the call, and `ptr` points to `len` readable bytes.
+        unsafe { sys::nk_button_text_styled(self.raw(), style.raw(), ptr, len) }
     }
 
     /// Show a text label.

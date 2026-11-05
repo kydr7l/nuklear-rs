@@ -1,7 +1,7 @@
 //! The window scope. `Context::window` gives a `Window` to its body.
 
 use crate::context::RowKind;
-use crate::{sys, Button, Context, LayoutFormat, Rect, Vec2};
+use crate::{sys, Button, Context, LayoutFormat, Rect, Vec2, WidgetState};
 
 /// An open window. Nuklear ends the window when the body of `Context::window` returns.
 pub struct Window<'a, 'f> {
@@ -284,6 +284,34 @@ impl Window<'_, '_> {
         }
         // SAFETY: the context is valid, the row has a column, and the sum of `index` and `cols` fits in an `int`.
         unsafe { sys::nk_spacing(self.raw(), cols) }
+    }
+
+    /// Take the next widget slot of the current row for a custom widget, and get its state and its bounds.
+    /// Draw the widget with `canvas`. For `WidgetState::Invalid` the slot is not visible, so draw nothing.
+    /// `WidgetState::Valid` means that the mouse is over the slot and the window takes input.
+    /// For `WidgetState::Rom` and `WidgetState::Disabled` the widget must not react to input.
+    pub fn widget(&mut self) -> (WidgetState, Rect) {
+        let mut bounds = sys::nk_rect::default();
+        // SAFETY: the context is valid, a window is open, and `bounds` is writable.
+        let state = unsafe { sys::nk_widget(&mut bounds, self.raw()) };
+        (WidgetState::try_from_raw(state as u32).unwrap_or(WidgetState::Invalid), bounds.into())
+    }
+
+    /// Get the clip rectangle of the current panel. The widgets of the panel draw inside it.
+    /// Use it with `Canvas::push_scissor` to restore the clip after a custom scissor.
+    pub fn layout_clip(&self) -> Rect {
+        // SAFETY: `panel` is not null inside a window body.
+        unsafe { (*self.panel()).clip }.into()
+    }
+
+    /// Get the width of `text` in the font of the context. See `Context::text_width`.
+    pub fn text_width(&self, text: &str) -> f32 {
+        self.ctx.text_width(text)
+    }
+
+    /// Get the height of the font of the context.
+    pub fn font_height(&self) -> f32 {
+        self.ctx.font_height()
     }
 
     /// Get the bounds of the next widget.
