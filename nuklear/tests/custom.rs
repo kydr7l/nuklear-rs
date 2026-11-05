@@ -136,3 +136,27 @@ fn click(ctx: &mut Context<'_>, at: Rect, down: bool) {
     assert!(clip.w > 0.0 && clip.w <= WIN.w && clip.h > 0.0);
     ctx.clear();
 }
+
+static DROPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+struct CountedFont;
+impl Font for CountedFont {
+    fn height(&self) -> f32 { 10.0 }
+    fn width(&self, _h: f32, t: &str) -> f32 { 5.0 * t.chars().count() as f32 }
+    fn glyph(&self, _h: f32, _c: char, _n: char) -> Glyph { Glyph::default() }
+    fn texture(&self) -> Handle { Handle::id(2) }
+}
+impl Drop for CountedFont {
+    fn drop(&mut self) { DROPS.fetch_add(1, std::sync::atomic::Ordering::SeqCst); }
+}
+
+#[test] fn context_owns_its_font_and_drops_it() {
+    fn keep(ctx: Context<'static>) -> Context<'static> { ctx }
+    let mut ctx = keep(Context::with_font(UserFont::new(CountedFont)).unwrap());
+    ctx.window("w", WIN, PanelFlags::empty(), |w| { w.layout_row_dynamic(30.0, 1); w.label("abc", TextAlign::LEFT); });
+    assert_eq!(ctx.text_width("abc"), 15.0);
+    assert!(ctx.commands().count() > 0);
+    ctx.clear();
+    assert_eq!(DROPS.load(std::sync::atomic::Ordering::SeqCst), 0);
+    drop(ctx);
+    assert_eq!(DROPS.load(std::sync::atomic::Ordering::SeqCst), 1);
+}

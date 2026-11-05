@@ -1,6 +1,6 @@
 //! The Nuklear context, the input scope and the window scope.
 
-use crate::{cstr, sys, text_arg, Button, CollapseState, Color, FontHandle, Key, PanelFlags, Rect, ShowState, Vec2, Window};
+use crate::{cstr, sys, text_arg, Button, CollapseState, Color, FontHandle, Key, PanelFlags, Rect, ShowState, UserFont, Vec2, Window};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -59,17 +59,34 @@ pub struct Context<'f> {
     pub(crate) ratios: Vec<Box<[f32]>>,
     /// This flag is `true` after `commands`. `nk_build` links the end of the command list to the used memory, so a new window would break the next walk.
     pub(crate) frame_built: bool,
+    /// The font of `with_font`. Rust drops the fields after `Drop::drop`, so the font lives until `nk_free` has run.
+    _owned_font: Option<UserFont>,
     _font: PhantomData<&'f sys::nk_user_font>,
+}
+
+impl Context<'static> {
+    /// Make a context that owns `font`. Use it when the context must live in a `'static` place, for example a `thread_local!`.
+    /// The function returns `None` when Nuklear cannot start or cannot get memory.
+    pub fn with_font(font: UserFont) -> Option<Context<'static>> {
+        let raw: *const sys::nk_user_font = font.raw();
+        // The C font lives in the heap allocation of the `UserFont`, so the pointer stays valid when the `UserFont` moves into the context.
+        Context::init(raw, Some(font))
+    }
 }
 
 impl<'f> Context<'f> {
     /// Make a context that uses `font`. The function returns `None` when Nuklear cannot start or cannot get memory.
     pub fn new<F: FontHandle>(font: &'f F) -> Option<Context<'f>> {
+        Context::init(font.raw(), None)
+    }
+
+    /// Make a context. `font` must stay valid for the life of the context: it lives for `'f`, or `owned` holds it.
+    fn init(font: *const sys::nk_user_font, owned: Option<UserFont>) -> Option<Context<'f>> {
         let p = Box::into_raw(Box::<sys::nk_context>::default());
-        // SAFETY: `p` comes from `Box::into_raw`. The font pointer stays valid for `'f`, and `'f` outlives the context.
+        // SAFETY: `p` comes from `Box::into_raw`. The font pointer stays valid for the life of the context, see `new` and `with_font`.
         // `nk_init` copies the allocator. Its slack bytes hold the aligned command writes that the grow path of `nk_buffer_alloc` can put past a block.
         // After `nk_init`, the command memory is allocated or null. The page pool allocates nothing yet.
-        let (ok, mem) = unsafe { (sys::nk_init(p, &crate::convert::slack_allocator(), font.raw()), (*p).memory.memory.ptr) };
+        let (ok, mem) = unsafe { (sys::nk_init(p, &crate::convert::slack_allocator(), font), (*p).memory.memory.ptr) };
         // With a null block, Nuklear would write through a null pointer, because the size is already set. Nothing else needs a free.
         if !ok || mem.is_null() {
             // SAFETY: `p` comes from `Box::into_raw`, and no other owner exists.
@@ -83,6 +100,7 @@ impl<'f> Context<'f> {
             panel: PanelState::default(),
             ratios: Vec::new(),
             frame_built: false,
+            _owned_font: owned,
             _font: PhantomData,
         })
     }

@@ -10,7 +10,8 @@
 //!
 //! # The frame protocol
 //!
-//! Make one `UserFont` and one `Context` that borrows the font. Then repeat these steps for each frame.
+//! Make one `UserFont` and one `Context` that borrows the font, or use `Context::with_font` for a context that owns the font.
+//! Then repeat these steps for each frame.
 //! Send the input with `Context::input`. Build the windows with `Context::window`. Read the result with `Context::commands`.
 //! Call `Context::clear` at the end of the frame.
 //!
