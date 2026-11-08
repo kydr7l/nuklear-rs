@@ -340,6 +340,7 @@ impl FontAtlasBuilder {
         }
         let (mut w, mut h) = (0, 0);
         // SAFETY: `atlas` is live. `w` and `h` are writable. On failure Nuklear frees its temporary memory and sets `pixel` to null.
+        // stb_truetype reads the font data here. The contract of `add_ttf` makes that data well formed.
         let px = unsafe { sys::nk_font_atlas_bake(self.atlas.as_ptr(), &mut w, &mut h, format.raw() as _) };
         if px.is_null() || w <= 0 || h <= 0 {
             return None; // `self` drops here and clears the atlas.
