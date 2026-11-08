@@ -279,7 +279,11 @@ impl<'f> Context<'f> {
         let ctx = self.raw();
         // SAFETY: the context is valid. `nk__begin` returns null or a pointer to the first command.
         let next = unsafe { sys::nk__begin(ctx) };
-        Commands { ctx, next, _ctx: PhantomData }
+        Commands {
+            ctx,
+            next,
+            _ctx: PhantomData,
+        }
     }
 }
 
@@ -317,11 +321,21 @@ unsafe fn read<'a>(cmd: *const sys::nk_command) -> Command<'a> {
         match kind {
             sys::NK_COMMAND_SCISSOR => {
                 let p = c!(nk_command_scissor);
-                Command::Scissor { x: (*p).x, y: (*p).y, w: (*p).w, h: (*p).h }
+                Command::Scissor {
+                    x: (*p).x,
+                    y: (*p).y,
+                    w: (*p).w,
+                    h: (*p).h,
+                }
             }
             sys::NK_COMMAND_LINE => {
                 let p = c!(nk_command_line);
-                Command::Line { thickness: (*p).line_thickness, begin: (*p).begin.into(), end: (*p).end.into(), color: (*p).color.into() }
+                Command::Line {
+                    thickness: (*p).line_thickness,
+                    begin: (*p).begin.into(),
+                    end: (*p).end.into(),
+                    color: (*p).color.into(),
+                }
             }
             sys::NK_COMMAND_CURVE => {
                 let p = c!(nk_command_curve);
@@ -348,7 +362,14 @@ unsafe fn read<'a>(cmd: *const sys::nk_command) -> Command<'a> {
             }
             sys::NK_COMMAND_RECT_FILLED => {
                 let p = c!(nk_command_rect_filled);
-                Command::RectFilled { rounding: (*p).rounding, x: (*p).x, y: (*p).y, w: (*p).w, h: (*p).h, color: (*p).color.into() }
+                Command::RectFilled {
+                    rounding: (*p).rounding,
+                    x: (*p).x,
+                    y: (*p).y,
+                    w: (*p).w,
+                    h: (*p).h,
+                    color: (*p).color.into(),
+                }
             }
             sys::NK_COMMAND_RECT_MULTI_COLOR => {
                 let p = c!(nk_command_rect_multi_color);
@@ -365,19 +386,45 @@ unsafe fn read<'a>(cmd: *const sys::nk_command) -> Command<'a> {
             }
             sys::NK_COMMAND_CIRCLE => {
                 let p = c!(nk_command_circle);
-                Command::Circle { thickness: (*p).line_thickness, x: (*p).x, y: (*p).y, w: (*p).w, h: (*p).h, color: (*p).color.into() }
+                Command::Circle {
+                    thickness: (*p).line_thickness,
+                    x: (*p).x,
+                    y: (*p).y,
+                    w: (*p).w,
+                    h: (*p).h,
+                    color: (*p).color.into(),
+                }
             }
             sys::NK_COMMAND_CIRCLE_FILLED => {
                 let p = c!(nk_command_circle_filled);
-                Command::CircleFilled { x: (*p).x, y: (*p).y, w: (*p).w, h: (*p).h, color: (*p).color.into() }
+                Command::CircleFilled {
+                    x: (*p).x,
+                    y: (*p).y,
+                    w: (*p).w,
+                    h: (*p).h,
+                    color: (*p).color.into(),
+                }
             }
             sys::NK_COMMAND_ARC => {
                 let p = c!(nk_command_arc);
-                Command::Arc { cx: (*p).cx, cy: (*p).cy, r: (*p).r, thickness: (*p).line_thickness, a: (*p).a, color: (*p).color.into() }
+                Command::Arc {
+                    cx: (*p).cx,
+                    cy: (*p).cy,
+                    r: (*p).r,
+                    thickness: (*p).line_thickness,
+                    a: (*p).a,
+                    color: (*p).color.into(),
+                }
             }
             sys::NK_COMMAND_ARC_FILLED => {
                 let p = c!(nk_command_arc_filled);
-                Command::ArcFilled { cx: (*p).cx, cy: (*p).cy, r: (*p).r, a: (*p).a, color: (*p).color.into() }
+                Command::ArcFilled {
+                    cx: (*p).cx,
+                    cy: (*p).cy,
+                    r: (*p).r,
+                    a: (*p).a,
+                    color: (*p).color.into(),
+                }
             }
             sys::NK_COMMAND_TRIANGLE => {
                 let p = c!(nk_command_triangle);
@@ -391,28 +438,57 @@ unsafe fn read<'a>(cmd: *const sys::nk_command) -> Command<'a> {
             }
             sys::NK_COMMAND_TRIANGLE_FILLED => {
                 let p = c!(nk_command_triangle_filled);
-                Command::TriangleFilled { a: (*p).a.into(), b: (*p).b.into(), c: (*p).c.into(), color: (*p).color.into() }
+                Command::TriangleFilled {
+                    a: (*p).a.into(),
+                    b: (*p).b.into(),
+                    c: (*p).c.into(),
+                    color: (*p).color.into(),
+                }
             }
             sys::NK_COMMAND_POLYGON => {
                 let p = c!(nk_command_polygon);
-                let points = std::slice::from_raw_parts(addr_of!((*p).points).cast::<Vec2i>(), (*p).point_count as usize);
-                Command::Polygon { color: (*p).color.into(), thickness: (*p).line_thickness, points }
+                let points = std::slice::from_raw_parts(
+                    addr_of!((*p).points).cast::<Vec2i>(),
+                    (*p).point_count as usize,
+                );
+                Command::Polygon {
+                    color: (*p).color.into(),
+                    thickness: (*p).line_thickness,
+                    points,
+                }
             }
             sys::NK_COMMAND_POLYGON_FILLED => {
                 let p = c!(nk_command_polygon_filled);
-                let points = std::slice::from_raw_parts(addr_of!((*p).points).cast::<Vec2i>(), (*p).point_count as usize);
-                Command::PolygonFilled { color: (*p).color.into(), points }
+                let points = std::slice::from_raw_parts(
+                    addr_of!((*p).points).cast::<Vec2i>(),
+                    (*p).point_count as usize,
+                );
+                Command::PolygonFilled {
+                    color: (*p).color.into(),
+                    points,
+                }
             }
             sys::NK_COMMAND_POLYLINE => {
                 let p = c!(nk_command_polyline);
-                let points = std::slice::from_raw_parts(addr_of!((*p).points).cast::<Vec2i>(), (*p).point_count as usize);
-                Command::Polyline { color: (*p).color.into(), thickness: (*p).line_thickness, points }
+                let points = std::slice::from_raw_parts(
+                    addr_of!((*p).points).cast::<Vec2i>(),
+                    (*p).point_count as usize,
+                );
+                Command::Polyline {
+                    color: (*p).color.into(),
+                    thickness: (*p).line_thickness,
+                    points,
+                }
             }
             sys::NK_COMMAND_TEXT => {
                 let p = c!(nk_command_text);
                 let font = (*p).font;
                 // `userdata` is the pointer of our trampoline, so the renderer needs the `texture` handle.
-                let font = if font.is_null() { Handle::id(0) } else { Handle(addr_of!((*font).texture).read()) };
+                let font = if font.is_null() {
+                    Handle::id(0)
+                } else {
+                    Handle(addr_of!((*font).texture).read())
+                };
                 // A negative length counts as an empty text.
                 let len = usize::try_from((*p).length).unwrap_or(0);
                 let bytes = std::slice::from_raw_parts(addr_of!((*p).string).cast::<u8>(), len);
@@ -430,7 +506,14 @@ unsafe fn read<'a>(cmd: *const sys::nk_command) -> Command<'a> {
             }
             sys::NK_COMMAND_IMAGE => {
                 let p = c!(nk_command_image);
-                Command::Image { x: (*p).x, y: (*p).y, w: (*p).w, h: (*p).h, img: Image::from_sys((*p).img), color: (*p).col.into() }
+                Command::Image {
+                    x: (*p).x,
+                    y: (*p).y,
+                    w: (*p).w,
+                    h: (*p).h,
+                    img: Image::from_sys((*p).img),
+                    color: (*p).col.into(),
+                }
             }
             _ => Command::Custom,
         }
@@ -443,13 +526,31 @@ mod tests {
 
     struct Fixed;
     impl Font for Fixed {
-        fn height(&self) -> f32 { 12.0 }
-        fn width(&self, _h: f32, t: &str) -> f32 { 6.0 * t.chars().count() as f32 }
-        fn glyph(&self, _h: f32, _c: char, _n: char) -> Glyph { Glyph { width: 6.0, height: 12.0, xadvance: 6.0, ..Default::default() } }
-        fn texture(&self) -> Handle { Handle::id(1) }
+        fn height(&self) -> f32 {
+            12.0
+        }
+        fn width(&self, _h: f32, t: &str) -> f32 {
+            6.0 * t.chars().count() as f32
+        }
+        fn glyph(&self, _h: f32, _c: char, _n: char) -> Glyph {
+            Glyph {
+                width: 6.0,
+                height: 12.0,
+                xadvance: 6.0,
+                ..Default::default()
+            }
+        }
+        fn texture(&self) -> Handle {
+            Handle::id(1)
+        }
     }
 
-    const BOUNDS: Rect = Rect { x: 0.0, y: 0.0, w: 200.0, h: 200.0 };
+    const BOUNDS: Rect = Rect {
+        x: 0.0,
+        y: 0.0,
+        w: 200.0,
+        h: 200.0,
+    };
 
     /// Draw a window "a" with a static popup. The popup code calls the `sys` functions directly.
     fn draw_a_with_popup(ctx: &mut Context<'_>) {
@@ -457,7 +558,12 @@ mod tests {
             w.layout_row_dynamic(30.0, 1);
             w.label("x", TextAlign::LEFT);
             let c = w.ctx.raw();
-            let r = sys::nk_rect { x: 10.0, y: 10.0, w: 100.0, h: 100.0 };
+            let r = sys::nk_rect {
+                x: 10.0,
+                y: 10.0,
+                w: 100.0,
+                h: 100.0,
+            };
             // SAFETY: the context is valid and a window is open. Every successful `nk_popup_begin` gets one `nk_popup_end`.
             unsafe {
                 if sys::nk_popup_begin(c, sys::NK_POPUP_STATIC as _, c"p".as_ptr(), 0, r) {
@@ -477,7 +583,8 @@ mod tests {
     }
 
     /// A popup flag that `commands` did not reset in frame N must not reach the build of frame N+1.
-    #[test] fn old_popup_flag_does_not_reach_next_build() {
+    #[test]
+    fn old_popup_flag_does_not_reach_next_build() {
         let font = UserFont::new(Fixed);
         let mut ctx = Context::new(&font).unwrap();
         draw_a_with_popup(&mut ctx);
@@ -493,7 +600,8 @@ mod tests {
     }
 
     /// A window that is hidden after its popup must not get its popup linked. With no other window, `nk_build` would write through null.
-    #[test] fn popup_of_window_hidden_after_popup_is_not_linked() {
+    #[test]
+    fn popup_of_window_hidden_after_popup_is_not_linked() {
         let font = UserFont::new(Fixed);
         let mut ctx = Context::new(&font).unwrap();
         draw_a_with_popup(&mut ctx);

@@ -22,7 +22,11 @@ const MAX_SEGMENTS: u32 = u16::MAX as u32;
 /// `align - 1` bytes past the end. The largest `align` is `MAX_VERTEX` (vertices); commands and indices use less.
 /// Each block has `MAX_VERTEX` extra bytes to hold that write.
 /// `nk_buffer_realloc` copies the old block itself, so this function ignores `_old` and always allocates a new block.
-unsafe extern "C" fn buffer_alloc(_: sys::nk_handle, _old: *mut c_void, size: sys::nk_size) -> *mut c_void {
+unsafe extern "C" fn buffer_alloc(
+    _: sys::nk_handle,
+    _old: *mut c_void,
+    size: sys::nk_size,
+) -> *mut c_void {
     match size.checked_add(MAX_VERTEX) {
         // SAFETY: calloc has no precondition. It returns null or a zeroed block, so all bytes of the block are initialized.
         Some(n) => unsafe { calloc(1, n) },
@@ -39,7 +43,11 @@ unsafe extern "C" fn buffer_free(_: sys::nk_handle, p: *mut c_void) {
 /// Get the allocator for every Nuklear buffer of this crate: calloc with `MAX_VERTEX` extra bytes per block.
 /// Nuklear copies the allocator, so a temporary value is enough.
 pub(crate) fn slack_allocator() -> sys::nk_allocator {
-    sys::nk_allocator { userdata: sys::nk_handle::default(), alloc: Some(buffer_alloc), free: Some(buffer_free) }
+    sys::nk_allocator {
+        userdata: sys::nk_handle::default(),
+        alloc: Some(buffer_alloc),
+        free: Some(buffer_free),
+    }
 }
 
 /// A growable Nuklear memory buffer. `Context::convert` fills it with draw commands, vertices or indices.
@@ -61,10 +69,14 @@ impl Buffer {
         };
         // With a null block, Nuklear would write through a null pointer, because the size is already set.
         if ptr.is_null() {
-            std::alloc::handle_alloc_error(std::alloc::Layout::from_size_align(4096 + MAX_VERTEX, 1).unwrap());
+            std::alloc::handle_alloc_error(
+                std::alloc::Layout::from_size_align(4096 + MAX_VERTEX, 1).unwrap(),
+            );
         }
         // SAFETY: `Box::into_raw` never returns a null pointer.
-        Buffer { raw: unsafe { NonNull::new_unchecked(p) } }
+        Buffer {
+            raw: unsafe { NonNull::new_unchecked(p) },
+        }
     }
 
     /// Get the used bytes of the buffer.
@@ -206,7 +218,11 @@ impl VertexLayout {
     /// Make a layout for vertices of `vertex_size` bytes with the alignment `vertex_align`.
     ///
     /// Each attribute is an `(attribute, format, offset)` tuple. The offset is in bytes from the start of the vertex.
-    pub fn new(vertex_size: usize, vertex_align: usize, attributes: &[(VertexAttribute, VertexFormat, usize)]) -> Result<VertexLayout, LayoutError> {
+    pub fn new(
+        vertex_size: usize,
+        vertex_align: usize,
+        attributes: &[(VertexAttribute, VertexFormat, usize)],
+    ) -> Result<VertexLayout, LayoutError> {
         if vertex_size == 0 {
             return Err(LayoutError::ZeroSize);
         }
@@ -225,14 +241,33 @@ impl VertexLayout {
             if format.is_color() != color {
                 return Err(LayoutError::FormatMismatch { attribute, format });
             }
-            let bytes = if color { format.size() } else { 2 * format.size() };
-            if offset.checked_add(bytes).is_none_or(|end| end > vertex_size) {
+            let bytes = if color {
+                format.size()
+            } else {
+                2 * format.size()
+            };
+            if offset
+                .checked_add(bytes)
+                .is_none_or(|end| end > vertex_size)
+            {
                 return Err(LayoutError::OutOfBounds { attribute, offset });
             }
-            elements.push(sys::nk_draw_vertex_layout_element { attribute: attribute.raw() as _, format: format.raw() as _, offset });
+            elements.push(sys::nk_draw_vertex_layout_element {
+                attribute: attribute.raw() as _,
+                format: format.raw() as _,
+                offset,
+            });
         }
-        elements.push(sys::nk_draw_vertex_layout_element { attribute: sys::NK_VERTEX_ATTRIBUTE_COUNT as _, format: sys::NK_FORMAT_COUNT as _, offset: 0 });
-        Ok(VertexLayout { elements, vertex_size, vertex_align })
+        elements.push(sys::nk_draw_vertex_layout_element {
+            attribute: sys::NK_VERTEX_ATTRIBUTE_COUNT as _,
+            format: sys::NK_FORMAT_COUNT as _,
+            offset: 0,
+        });
+        Ok(VertexLayout {
+            elements,
+            vertex_size,
+            vertex_align,
+        })
     }
 }
 
@@ -321,8 +356,18 @@ impl<'f> Context<'f> {
     /// cmds.clear();
     /// draws.next();
     /// ```
-    pub fn convert<'a>(&'a mut self, cmds: &'a mut Buffer, vertices: &mut Buffer, elements: &mut Buffer, config: &ConvertConfig<'_>) -> Result<DrawCommands<'a>, ConvertError> {
-        let segments = [config.circle_segment_count, config.arc_segment_count, config.curve_segment_count];
+    pub fn convert<'a>(
+        &'a mut self,
+        cmds: &'a mut Buffer,
+        vertices: &mut Buffer,
+        elements: &mut Buffer,
+        config: &ConvertConfig<'_>,
+    ) -> Result<DrawCommands<'a>, ConvertError> {
+        let segments = [
+            config.circle_segment_count,
+            config.arc_segment_count,
+            config.curve_segment_count,
+        ];
         // `nk_draw_list_path_arc_to` and `_curve_to` loop with `i <= segments`, so `u32::MAX` never ends.
         if segments.iter().any(|&s| s > MAX_SEGMENTS) {
             return Err(ConvertError(sys::NK_CONVERT_INVALID_PARAM as u32));
@@ -337,7 +382,10 @@ impl<'f> Context<'f> {
             circle_segment_count: config.circle_segment_count,
             arc_segment_count: config.arc_segment_count,
             curve_segment_count: config.curve_segment_count,
-            tex_null: sys::nk_draw_null_texture { texture: config.null.texture.0, uv: config.null.uv.into() },
+            tex_null: sys::nk_draw_null_texture {
+                texture: config.null.texture.0,
+                uv: config.null.uv.into(),
+            },
             vertex_layout: layout.elements.as_ptr(),
             vertex_size: layout.vertex_size,
             vertex_alignment: layout.vertex_align,
@@ -352,7 +400,15 @@ impl<'f> Context<'f> {
         // SAFETY: the context and the three buffers are live and distinct, because they are borrowed mutably.
         // The layout ends with the end marker, and `VertexLayout::new` keeps every element write inside `vertex_size` bytes.
         // `begin_build` removed the stale popup links, so `nk_build` reads only commands of this frame.
-        let res = unsafe { sys::nk_convert(ctx, buffer, vertices.raw.as_ptr(), elements.raw.as_ptr(), &c) };
+        let res = unsafe {
+            sys::nk_convert(
+                ctx,
+                buffer,
+                vertices.raw.as_ptr(),
+                elements.raw.as_ptr(),
+                &c,
+            )
+        };
         if res != sys::NK_CONVERT_SUCCESS as u32 {
             return Err(ConvertError(res));
         }
@@ -360,8 +416,18 @@ impl<'f> Context<'f> {
         let next = unsafe { sys::nk__draw_begin(ctx, buffer) };
         // `nk__draw_end` subtracts `cmd_count - 1`, which wraps for zero commands, so call it only when a command exists.
         // SAFETY: as above. At least one command exists.
-        let end = if next.is_null() { ptr::null() } else { unsafe { sys::nk__draw_end(ctx, buffer) } };
-        Ok(DrawCommands { ctx, buffer, next, end, _borrow: PhantomData })
+        let end = if next.is_null() {
+            ptr::null()
+        } else {
+            unsafe { sys::nk__draw_end(ctx, buffer) }
+        };
+        Ok(DrawCommands {
+            ctx,
+            buffer,
+            next,
+            end,
+            _borrow: PhantomData,
+        })
     }
 }
 
@@ -383,6 +449,10 @@ impl Iterator for DrawCommands<'_> {
         // SAFETY: as above. Nuklear allocates the commands with the alignment of `nk_draw_command`.
         let c = unsafe { cmd.read() };
         // Nuklear copies each texture handle from a handle of this crate, so all bytes of the union are initialized.
-        Some(DrawCommand { elem_count: c.elem_count, clip_rect: c.clip_rect.into(), texture: Handle(c.texture) })
+        Some(DrawCommand {
+            elem_count: c.elem_count,
+            clip_rect: c.clip_rect.into(),
+            texture: Handle(c.texture),
+        })
     }
 }

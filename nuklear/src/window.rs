@@ -103,7 +103,11 @@ impl Window<'_, '_> {
         self.ctx.panel.row_kind = RowKind::None;
         // Nuklear keeps the pointer until the window ends, so the context owns a copy of the ratios.
         self.ctx.ratios.push(ratios[..cols].into());
-        let ptr = self.ctx.ratios.last().map_or(std::ptr::null(), |r| r.as_ptr());
+        let ptr = self
+            .ctx
+            .ratios
+            .last()
+            .map_or(std::ptr::null(), |r| r.as_ptr());
         // SAFETY: the context is valid, and a window is open. `ptr` points to `cols` floats that live until the window ends.
         unsafe { sys::nk_layout_row(self.raw(), fmt.raw() as _, height, cols as i32, ptr) }
     }
@@ -147,7 +151,8 @@ impl Window<'_, '_> {
     /// Check that a template column fits. The method counts the column when it fits.
     fn template_slot(&mut self) -> bool {
         let panel = &mut self.ctx.panel;
-        let fits = panel.row_kind == RowKind::Template && panel.template_cols < MAX_TEMPLATE_COLUMNS;
+        let fits =
+            panel.row_kind == RowKind::Template && panel.template_cols < MAX_TEMPLATE_COLUMNS;
         panel.template_cols += u8::from(fits);
         fits
     }
@@ -294,7 +299,10 @@ impl Window<'_, '_> {
         let mut bounds = sys::nk_rect::default();
         // SAFETY: the context is valid, a window is open, and `bounds` is writable.
         let state = unsafe { sys::nk_widget(&mut bounds, self.raw()) };
-        (WidgetState::try_from_raw(state as u32).unwrap_or(WidgetState::Invalid), bounds.into())
+        (
+            WidgetState::try_from_raw(state as u32).unwrap_or(WidgetState::Invalid),
+            bounds.into(),
+        )
     }
 
     /// Get the clip rectangle of the current panel. The widgets of the panel draw inside it.
@@ -335,7 +343,9 @@ impl Window<'_, '_> {
     /// Check if the mouse button `button` is in the state `down` over the next widget.
     pub fn widget_has_mouse_click_down(&self, button: Button, down: bool) -> bool {
         // SAFETY: the context is valid, and an open window with a layout is current.
-        unsafe { sys::nk_widget_has_mouse_click_down(self.ctx.raw_const(), button.raw() as _, down) }
+        unsafe {
+            sys::nk_widget_has_mouse_click_down(self.ctx.raw_const(), button.raw() as _, down)
+        }
     }
 
     /// Run `f`. The widgets that `f` makes are disabled and do not react to input. A panic in `f` aborts the process.

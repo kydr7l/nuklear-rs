@@ -1,35 +1,66 @@
 mod common;
 use nuklear::*;
-const WIN: Rect = Rect { x: 0.0, y: 0.0, w: 300.0, h: 300.0 };
+const WIN: Rect = Rect {
+    x: 0.0,
+    y: 0.0,
+    w: 300.0,
+    h: 300.0,
+};
 
 fn click(ctx: &mut Context<'_>, at: Rect) {
     let (x, y) = ((at.x + at.w / 2.0) as i32, (at.y + at.h / 2.0) as i32);
-    ctx.input(|i| { i.motion(x, y); i.button(Button::Left, x, y, true); });
+    ctx.input(|i| {
+        i.motion(x, y);
+        i.button(Button::Left, x, y, true);
+    });
 }
 
-#[test] fn button_reports_click() {
+#[test]
+fn button_reports_click() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
-    let bounds = ctx.window("w", WIN, PanelFlags::empty(), |w| { w.layout_row_dynamic(30.0, 1); let b = w.widget_bounds(); assert!(!w.button_label("ok")); b }).unwrap();
+    let bounds = ctx
+        .window("w", WIN, PanelFlags::empty(), |w| {
+            w.layout_row_dynamic(30.0, 1);
+            let b = w.widget_bounds();
+            assert!(!w.button_label("ok"));
+            b
+        })
+        .unwrap();
     ctx.clear();
     click(&mut ctx, bounds);
-    let clicked = ctx.window("w", WIN, PanelFlags::empty(), |w| { w.layout_row_dynamic(30.0, 1); w.button_label("ok") });
+    let clicked = ctx.window("w", WIN, PanelFlags::empty(), |w| {
+        w.layout_row_dynamic(30.0, 1);
+        w.button_label("ok")
+    });
     assert_eq!(clicked, Some(true));
     ctx.clear();
 }
-#[test] fn checkbox_toggles_on_click() {
+#[test]
+fn checkbox_toggles_on_click() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
     let mut on = false;
-    let bounds = ctx.window("w", WIN, PanelFlags::empty(), |w| { w.layout_row_dynamic(30.0, 1); let b = w.widget_bounds(); w.checkbox("c", &mut on); b }).unwrap();
+    let bounds = ctx
+        .window("w", WIN, PanelFlags::empty(), |w| {
+            w.layout_row_dynamic(30.0, 1);
+            let b = w.widget_bounds();
+            w.checkbox("c", &mut on);
+            b
+        })
+        .unwrap();
     ctx.clear();
     click(&mut ctx, bounds);
-    let changed = ctx.window("w", WIN, PanelFlags::empty(), |w| { w.layout_row_dynamic(30.0, 1); w.checkbox("c", &mut on) });
+    let changed = ctx.window("w", WIN, PanelFlags::empty(), |w| {
+        w.layout_row_dynamic(30.0, 1);
+        w.checkbox("c", &mut on)
+    });
     assert_eq!(changed, Some(true));
     assert!(on);
     ctx.clear();
 }
-#[test] fn slider_and_property_keep_values_without_input() {
+#[test]
+fn slider_and_property_keep_values_without_input() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
     let (mut s, mut p, mut prog) = (0.5f32, 3i32, 2usize);
@@ -44,7 +75,8 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
     assert_eq!((s, p, prog), (0.5, 3, 2));
     ctx.clear();
 }
-#[test] fn empty_inputs_are_no_ops() {
+#[test]
+fn empty_inputs_are_no_ops() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
     ctx.window("w", WIN, PanelFlags::empty(), |w| {
@@ -53,7 +85,9 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
         w.plot(ChartType::Lines, &[], 0);
         w.plot(ChartType::Lines, &[1.0], 5);
         w.layout_row_template_begin(30.0);
-        for _ in 0..40 { w.layout_row_template_push_static(10.0); }
+        for _ in 0..40 {
+            w.layout_row_template_push_static(10.0);
+        }
         w.layout_row_template_end();
         w.layout_row_push(1.0);
         w.layout_row_end();
@@ -63,7 +97,8 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
     });
     ctx.clear();
 }
-#[test] fn bad_numeric_parameters_are_rejected() {
+#[test]
+fn bad_numeric_parameters_are_rejected() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
     let (mut s, mut i, mut prog, mut p) = (0.5f32, 3i32, 2usize, 1.0f32);
@@ -82,12 +117,16 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
     ctx.clear();
 }
 // The ratio array must outlive `layout_row`, because later widgets read it.
-#[test] fn layout_row_ratios_survive_the_call() {
+#[test]
+fn layout_row_ratios_survive_the_call() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
     for _ in 0..2 {
         ctx.window("w", WIN, PanelFlags::empty(), |w| {
-            { let r = vec![0.25f32, 0.75]; w.layout_row(LayoutFormat::Dynamic, 30.0, &r); }
+            {
+                let r = vec![0.25f32, 0.75];
+                w.layout_row(LayoutFormat::Dynamic, 30.0, &r);
+            }
             let a = w.widget_bounds();
             w.label("a", TextAlign::LEFT);
             let b = w.widget_bounds();
@@ -100,7 +139,8 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
         ctx.clear();
     }
 }
-#[test] fn spacing_and_spacer_are_guarded() {
+#[test]
+fn spacing_and_spacer_are_guarded() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
     ctx.window("w", WIN, PanelFlags::empty(), |w| {
@@ -115,7 +155,8 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
     });
     ctx.clear();
 }
-#[test] fn tooltip_runs_after_a_row() {
+#[test]
+fn tooltip_runs_after_a_row() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
     for _ in 0..2 {
@@ -129,12 +170,18 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
         ctx.clear();
     }
 }
-#[test] fn space_layout_and_queries() {
+#[test]
+fn space_layout_and_queries() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
     ctx.window("w", WIN, PanelFlags::empty(), |w| {
         w.layout_space_begin(LayoutFormat::Static, 100.0, 1);
-        w.layout_space_push(Rect { x: 0.0, y: 0.0, w: 50.0, h: 20.0 });
+        w.layout_space_push(Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 50.0,
+            h: 20.0,
+        });
         w.label("s", TextAlign::LEFT);
         let v = w.layout_space_to_local(w.layout_space_to_screen(Vec2 { x: 3.0, y: 4.0 }));
         assert_eq!(v, Vec2 { x: 3.0, y: 4.0 });
@@ -150,15 +197,30 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
     });
     ctx.clear();
 }
-#[test] fn widgets_smoke() {
+#[test]
+fn widgets_smoke() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
     let img = Image::new(Handle::id(1), 8, 8);
     let (mut b, mut flags, mut f, mut i, mut d) = (false, 0u32, 0.5f32, 3i32, 2.0f64);
-    let mut c = Colorf { r: 0.1, g: 0.2, b: 0.3, a: 1.0 };
+    let mut c = Colorf {
+        r: 0.1,
+        g: 0.2,
+        b: 0.3,
+        a: 1.0,
+    };
     ctx.window("w", WIN, PanelFlags::empty(), |w| {
         w.layout_row_dynamic(30.0, 1);
-        w.label_colored("é", TextAlign::CENTERED, Color { r: 1, g: 2, b: 3, a: 4 });
+        w.label_colored(
+            "é",
+            TextAlign::CENTERED,
+            Color {
+                r: 1,
+                g: 2,
+                b: 3,
+                a: 4,
+            },
+        );
         w.label_wrap("wrap me");
         w.label_wrap_colored("wrap", Color::default());
         w.image(img);
@@ -184,7 +246,8 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
     ctx.clear();
 }
 // Nuklear formats the value into a 64 byte buffer. A value of 2^31 or more overflows it.
-#[test] fn float_property_rejects_huge_values() {
+#[test]
+fn float_property_rejects_huge_values() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
     ctx.window("w", WIN, PanelFlags::empty(), |w| {
@@ -217,28 +280,56 @@ fn click(ctx: &mut Context<'_>, at: Rect) {
     ctx.clear();
 }
 // With equal values, Nuklear divides 0 by 0 and casts the NaN to `short`. `plot` widens the range, so the lines stay inside the chart.
-#[test] fn plot_of_equal_values_draws_inside_the_chart() {
+#[test]
+fn plot_of_equal_values_draws_inside_the_chart() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
-    let b = ctx.window("w", WIN, PanelFlags::empty(), |w| {
-        w.layout_row_dynamic(100.0, 1);
-        let b = w.widget_bounds();
-        w.plot(ChartType::Lines, &[0.0; 5], 0);
-        b
-    }).unwrap();
-    let ys: Vec<f32> = ctx.commands().filter_map(|c| match c { Command::Line { begin, end, .. } => Some([begin.y as f32, end.y as f32]), _ => None }).flatten().collect();
+    let b = ctx
+        .window("w", WIN, PanelFlags::empty(), |w| {
+            w.layout_row_dynamic(100.0, 1);
+            let b = w.widget_bounds();
+            w.plot(ChartType::Lines, &[0.0; 5], 0);
+            b
+        })
+        .unwrap();
+    let ys: Vec<f32> = ctx
+        .commands()
+        .filter_map(|c| match c {
+            Command::Line { begin, end, .. } => Some([begin.y as f32, end.y as f32]),
+            _ => None,
+        })
+        .flatten()
+        .collect();
     assert!(!ys.is_empty());
-    assert!(ys.iter().all(|&y| y > b.y && y < b.y + b.h), "{ys:?} outside {b:?}");
+    assert!(
+        ys.iter().all(|&y| y > b.y && y < b.y + b.h),
+        "{ys:?} outside {b:?}"
+    );
     ctx.clear();
 }
 // Nuklear asserts on a zero width and divides by the window x position instead of the width.
-#[test] fn layout_ratio_from_pixel_uses_the_window_width() {
+#[test]
+fn layout_ratio_from_pixel_uses_the_window_width() {
     let font = UserFont::new(common::FixedFont);
     let mut ctx = Context::new(&font).unwrap();
-    let r = ctx.window("w", Rect { x: 0.0, y: 0.0, w: 200.0, h: 100.0 }, PanelFlags::empty(), |w| {
-        w.layout_row_dynamic(20.0, 1);
-        (w.layout_ratio_from_pixel(50.0), w.layout_ratio_from_pixel(400.0), w.layout_ratio_from_pixel(0.0))
-    });
+    let r = ctx.window(
+        "w",
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 200.0,
+            h: 100.0,
+        },
+        PanelFlags::empty(),
+        |w| {
+            w.layout_row_dynamic(20.0, 1);
+            (
+                w.layout_ratio_from_pixel(50.0),
+                w.layout_ratio_from_pixel(400.0),
+                w.layout_ratio_from_pixel(0.0),
+            )
+        },
+    );
     assert_eq!(r, Some((0.25, 1.0, 0.0)));
     ctx.clear();
 }

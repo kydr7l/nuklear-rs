@@ -52,7 +52,11 @@ impl Window<'_, '_> {
         let buf = unsafe { sys::nk_window_get_canvas(ctx) };
         // SAFETY: the context is valid. `Context::new` and `Context::set_font` set the font from a reference, so it is not null.
         let font = unsafe { (*ctx).style.font };
-        Canvas { buf, font, _window: PhantomData }
+        Canvas {
+            buf,
+            font,
+            _window: PhantomData,
+        }
     }
 }
 
@@ -69,16 +73,52 @@ impl Canvas<'_> {
     pub fn stroke_line(&mut self, begin: Vec2, end: Vec2, thickness: f32, color: Color) {
         if point_ok(begin) && point_ok(end) && extent(thickness) {
             // SAFETY: the buffer is valid for the life of the canvas, and every cast is defined.
-            unsafe { sys::nk_stroke_line(self.buf, begin.x, begin.y, end.x, end.y, thickness, color.into()) }
+            unsafe {
+                sys::nk_stroke_line(
+                    self.buf,
+                    begin.x,
+                    begin.y,
+                    end.x,
+                    end.y,
+                    thickness,
+                    color.into(),
+                )
+            }
         }
     }
 
     /// Draw a cubic Bézier curve from `begin` to `end` with the control points `ctrl`.
-    pub fn stroke_curve(&mut self, begin: Vec2, ctrl: [Vec2; 2], end: Vec2, thickness: f32, color: Color) {
-        if point_ok(begin) && point_ok(ctrl[0]) && point_ok(ctrl[1]) && point_ok(end) && extent(thickness) {
+    pub fn stroke_curve(
+        &mut self,
+        begin: Vec2,
+        ctrl: [Vec2; 2],
+        end: Vec2,
+        thickness: f32,
+        color: Color,
+    ) {
+        if point_ok(begin)
+            && point_ok(ctrl[0])
+            && point_ok(ctrl[1])
+            && point_ok(end)
+            && extent(thickness)
+        {
             let [c0, c1] = ctrl;
             // SAFETY: the buffer is valid for the life of the canvas, and every cast is defined.
-            unsafe { sys::nk_stroke_curve(self.buf, begin.x, begin.y, c0.x, c0.y, c1.x, c1.y, end.x, end.y, thickness, color.into()) }
+            unsafe {
+                sys::nk_stroke_curve(
+                    self.buf,
+                    begin.x,
+                    begin.y,
+                    c0.x,
+                    c0.y,
+                    c1.x,
+                    c1.y,
+                    end.x,
+                    end.y,
+                    thickness,
+                    color.into(),
+                )
+            }
         }
     }
 
@@ -101,10 +141,26 @@ impl Canvas<'_> {
     /// Draw a filled rectangle with one color for each corner.
     /// The Nuklear names do not match the corners: `left` is the top left corner, `top` is the top right corner,
     /// `right` is the bottom right corner, and `bottom` is the bottom left corner.
-    pub fn fill_rect_multi_color(&mut self, rect: Rect, left: Color, top: Color, right: Color, bottom: Color) {
+    pub fn fill_rect_multi_color(
+        &mut self,
+        rect: Rect,
+        left: Color,
+        top: Color,
+        right: Color,
+        bottom: Color,
+    ) {
         if rect_ok(rect) {
             // SAFETY: the buffer is valid for the life of the canvas, and the casts of `rect` are defined.
-            unsafe { sys::nk_fill_rect_multi_color(self.buf, rect.into(), left.into(), top.into(), right.into(), bottom.into()) }
+            unsafe {
+                sys::nk_fill_rect_multi_color(
+                    self.buf,
+                    rect.into(),
+                    left.into(),
+                    top.into(),
+                    right.into(),
+                    bottom.into(),
+                )
+            }
         }
     }
 
@@ -125,10 +181,29 @@ impl Canvas<'_> {
     }
 
     /// Draw an arc outline around `center`. The angles are in radians.
-    pub fn stroke_arc(&mut self, center: Vec2, radius: f32, a_min: f32, a_max: f32, thickness: f32, color: Color) {
+    pub fn stroke_arc(
+        &mut self,
+        center: Vec2,
+        radius: f32,
+        a_min: f32,
+        a_max: f32,
+        thickness: f32,
+        color: Color,
+    ) {
         if point_ok(center) && extent(radius) && extent(thickness) {
             // SAFETY: the buffer is valid for the life of the canvas, and every cast is defined. Nuklear stores the angles as floats.
-            unsafe { sys::nk_stroke_arc(self.buf, center.x, center.y, radius, a_min, a_max, thickness, color.into()) }
+            unsafe {
+                sys::nk_stroke_arc(
+                    self.buf,
+                    center.x,
+                    center.y,
+                    radius,
+                    a_min,
+                    a_max,
+                    thickness,
+                    color.into(),
+                )
+            }
         }
     }
 
@@ -136,7 +211,17 @@ impl Canvas<'_> {
     pub fn fill_arc(&mut self, center: Vec2, radius: f32, a_min: f32, a_max: f32, color: Color) {
         if point_ok(center) && extent(radius) {
             // SAFETY: the buffer is valid for the life of the canvas, and every cast is defined. Nuklear stores the angles as floats.
-            unsafe { sys::nk_fill_arc(self.buf, center.x, center.y, radius, a_min, a_max, color.into()) }
+            unsafe {
+                sys::nk_fill_arc(
+                    self.buf,
+                    center.x,
+                    center.y,
+                    radius,
+                    a_min,
+                    a_max,
+                    color.into(),
+                )
+            }
         }
     }
 
@@ -144,7 +229,19 @@ impl Canvas<'_> {
     pub fn stroke_triangle(&mut self, a: Vec2, b: Vec2, c: Vec2, thickness: f32, color: Color) {
         if point_ok(a) && point_ok(b) && point_ok(c) && extent(thickness) {
             // SAFETY: the buffer is valid for the life of the canvas, and every cast is defined.
-            unsafe { sys::nk_stroke_triangle(self.buf, a.x, a.y, b.x, b.y, c.x, c.y, thickness, color.into()) }
+            unsafe {
+                sys::nk_stroke_triangle(
+                    self.buf,
+                    a.x,
+                    a.y,
+                    b.x,
+                    b.y,
+                    c.x,
+                    c.y,
+                    thickness,
+                    color.into(),
+                )
+            }
         }
     }
 
@@ -160,7 +257,15 @@ impl Canvas<'_> {
     pub fn stroke_polygon(&mut self, points: &[Vec2], thickness: f32, color: Color) {
         if points_ok(points) && extent(thickness) {
             // SAFETY: the buffer is valid for the life of the canvas. `Vec2` is `repr(C)` with two floats, so the slice is `2 * len` floats.
-            unsafe { sys::nk_stroke_polygon(self.buf, points.as_ptr().cast(), points.len() as i32, thickness, color.into()) }
+            unsafe {
+                sys::nk_stroke_polygon(
+                    self.buf,
+                    points.as_ptr().cast(),
+                    points.len() as i32,
+                    thickness,
+                    color.into(),
+                )
+            }
         }
     }
 
@@ -168,7 +273,14 @@ impl Canvas<'_> {
     pub fn fill_polygon(&mut self, points: &[Vec2], color: Color) {
         if points_ok(points) {
             // SAFETY: the buffer is valid for the life of the canvas. `Vec2` is `repr(C)` with two floats, so the slice is `2 * len` floats.
-            unsafe { sys::nk_fill_polygon(self.buf, points.as_ptr().cast(), points.len() as i32, color.into()) }
+            unsafe {
+                sys::nk_fill_polygon(
+                    self.buf,
+                    points.as_ptr().cast(),
+                    points.len() as i32,
+                    color.into(),
+                )
+            }
         }
     }
 
@@ -176,7 +288,15 @@ impl Canvas<'_> {
     pub fn stroke_polyline(&mut self, points: &[Vec2], thickness: f32, color: Color) {
         if points_ok(points) && extent(thickness) {
             // SAFETY: the buffer is valid for the life of the canvas. `Vec2` is `repr(C)` with two floats, so the slice is `2 * len` floats.
-            unsafe { sys::nk_stroke_polyline(self.buf, points.as_ptr().cast(), points.len() as i32, thickness, color.into()) }
+            unsafe {
+                sys::nk_stroke_polyline(
+                    self.buf,
+                    points.as_ptr().cast(),
+                    points.len() as i32,
+                    thickness,
+                    color.into(),
+                )
+            }
         }
     }
 
@@ -196,7 +316,17 @@ impl Canvas<'_> {
             let (ptr, len) = text_arg(text);
             // SAFETY: the buffer is valid for the life of the canvas, the casts of `rect` are defined, and `ptr` points to `len` readable bytes.
             // The font is valid, because the context borrows it. Every font of this crate has a width callback.
-            unsafe { sys::nk_draw_text(self.buf, rect.into(), ptr, len, self.font, background.into(), foreground.into()) }
+            unsafe {
+                sys::nk_draw_text(
+                    self.buf,
+                    rect.into(),
+                    ptr,
+                    len,
+                    self.font,
+                    background.into(),
+                    foreground.into(),
+                )
+            }
         }
     }
 }

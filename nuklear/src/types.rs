@@ -178,7 +178,12 @@ pub struct Image {
 impl Image {
     /// Make an image that uses the full texture.
     pub fn new(handle: Handle, w: u16, h: u16) -> Image {
-        Image { handle, w, h, region: [0, 0, w, h] }
+        Image {
+            handle,
+            w,
+            h,
+            region: [0, 0, w, h],
+        }
     }
 }
 
@@ -186,13 +191,23 @@ impl Image {
     /// Make an image from a C image. The handle must come from C or from this crate, so the union is zeroed.
     /// This function is not public: safe code could build a `sys::nk_handle` with uninitialized bytes.
     pub(crate) fn from_sys(v: sys::nk_image) -> Image {
-        Image { handle: Handle(v.handle), w: v.w, h: v.h, region: v.region }
+        Image {
+            handle: Handle(v.handle),
+            w: v.w,
+            h: v.h,
+            region: v.region,
+        }
     }
 }
 
 impl From<Image> for sys::nk_image {
     fn from(v: Image) -> Self {
-        sys::nk_image { handle: v.handle.0, w: v.w, h: v.h, region: v.region }
+        sys::nk_image {
+            handle: v.handle.0,
+            w: v.w,
+            h: v.h,
+            region: v.region,
+        }
     }
 }
 
@@ -528,15 +543,94 @@ impl Filter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn rect_roundtrip() { let r = Rect { x: 1.0, y: 2.0, w: 3.0, h: 4.0 }; assert_eq!(Rect::from(sys::nk_rect::from(r)), r); }
-    #[test] fn handle_id_and_ptr_read_back() { assert_eq!(Handle::id(7).as_id(), 7); assert!(Handle::id(0).as_ptr().is_null()); let p = 0x10usize as *mut std::ffi::c_void; assert_eq!(Handle::ptr(p).as_ptr(), p); }
-    #[test] fn flags_or_and_contains() { let f = PanelFlags::BORDER | PanelFlags::TITLE; assert!(f.contains(PanelFlags::TITLE)); assert!(!f.contains(PanelFlags::MOVABLE)); assert_eq!(f.bits(), sys::NK_WINDOW_BORDER as u32 | sys::NK_WINDOW_TITLE as u32); }
-    #[test] fn c_bits_drops_movable_without_input() { let m = PanelFlags::MOVABLE; assert_eq!(m.c_bits(), m.bits()); assert_eq!((m | PanelFlags::NO_INPUT).c_bits(), PanelFlags::NO_INPUT.bits()); }
-    #[test] fn enum_values_match_sys() { assert_eq!(Key::Enter.raw(), sys::NK_KEY_ENTER as u32); assert_eq!(Symbol::Hamburger.raw(), sys::NK_SYMBOL_HAMBURGER as u32); assert_eq!(VertexFormat::Rgba32.raw(), sys::NK_FORMAT_RGBA32 as u32); }
-    #[test] fn image_roundtrip_through_sys() { let i = Image::new(Handle::id(9), 4, 5); let back = Image::from_sys(sys::nk_image::from(i)); assert_eq!(back, i); assert_eq!(back.handle.as_id(), 9); assert_eq!(back.region, [0, 0, 4, 5]); }
-    #[test] fn cstr_truncates_at_nul() { assert_eq!(crate::cstr("ab\0cd").as_bytes(), b"ab"); }
-    #[test] fn from_bits_drops_private_bits() { assert_eq!(PanelFlags::from_bits(1 << 12), PanelFlags::empty()); }
-    #[test] fn hsva_round_trip() { let c = Colorf { r: 1.0, g: 0.5, b: 0.0, a: 0.25 }; let back = Colorf::from_hsva(c.to_hsva()); for (x, y) in [(back.r, c.r), (back.g, c.g), (back.b, c.b), (back.a, c.a)] { assert!((x - y).abs() < 1e-4); } }
-    #[test] fn hsv_clamps_bad_values() { assert_eq!(Color::from_hsv(f32::NAN, 2.0, 1.0), Color::from_hsv(0.0, 1.0, 1.0)); assert_eq!(Colorf::from_hsva([1e30, 0.0, 0.0, f32::NAN]), Colorf::from_hsva([1.0, 0.0, 0.0, 0.0])); }
-    #[test] fn widget_state_from_raw() { assert_eq!(WidgetState::try_from_raw(sys::NK_WIDGET_ROM as u32), Some(WidgetState::Rom)); assert_eq!(WidgetState::try_from_raw(99), None); }
+    #[test]
+    fn rect_roundtrip() {
+        let r = Rect {
+            x: 1.0,
+            y: 2.0,
+            w: 3.0,
+            h: 4.0,
+        };
+        assert_eq!(Rect::from(sys::nk_rect::from(r)), r);
+    }
+    #[test]
+    fn handle_id_and_ptr_read_back() {
+        assert_eq!(Handle::id(7).as_id(), 7);
+        assert!(Handle::id(0).as_ptr().is_null());
+        let p = 0x10usize as *mut std::ffi::c_void;
+        assert_eq!(Handle::ptr(p).as_ptr(), p);
+    }
+    #[test]
+    fn flags_or_and_contains() {
+        let f = PanelFlags::BORDER | PanelFlags::TITLE;
+        assert!(f.contains(PanelFlags::TITLE));
+        assert!(!f.contains(PanelFlags::MOVABLE));
+        assert_eq!(
+            f.bits(),
+            sys::NK_WINDOW_BORDER as u32 | sys::NK_WINDOW_TITLE as u32
+        );
+    }
+    #[test]
+    fn c_bits_drops_movable_without_input() {
+        let m = PanelFlags::MOVABLE;
+        assert_eq!(m.c_bits(), m.bits());
+        assert_eq!(
+            (m | PanelFlags::NO_INPUT).c_bits(),
+            PanelFlags::NO_INPUT.bits()
+        );
+    }
+    #[test]
+    fn enum_values_match_sys() {
+        assert_eq!(Key::Enter.raw(), sys::NK_KEY_ENTER as u32);
+        assert_eq!(Symbol::Hamburger.raw(), sys::NK_SYMBOL_HAMBURGER as u32);
+        assert_eq!(VertexFormat::Rgba32.raw(), sys::NK_FORMAT_RGBA32 as u32);
+    }
+    #[test]
+    fn image_roundtrip_through_sys() {
+        let i = Image::new(Handle::id(9), 4, 5);
+        let back = Image::from_sys(sys::nk_image::from(i));
+        assert_eq!(back, i);
+        assert_eq!(back.handle.as_id(), 9);
+        assert_eq!(back.region, [0, 0, 4, 5]);
+    }
+    #[test]
+    fn cstr_truncates_at_nul() {
+        assert_eq!(crate::cstr("ab\0cd").as_bytes(), b"ab");
+    }
+    #[test]
+    fn from_bits_drops_private_bits() {
+        assert_eq!(PanelFlags::from_bits(1 << 12), PanelFlags::empty());
+    }
+    #[test]
+    fn hsva_round_trip() {
+        let c = Colorf {
+            r: 1.0,
+            g: 0.5,
+            b: 0.0,
+            a: 0.25,
+        };
+        let back = Colorf::from_hsva(c.to_hsva());
+        for (x, y) in [(back.r, c.r), (back.g, c.g), (back.b, c.b), (back.a, c.a)] {
+            assert!((x - y).abs() < 1e-4);
+        }
+    }
+    #[test]
+    fn hsv_clamps_bad_values() {
+        assert_eq!(
+            Color::from_hsv(f32::NAN, 2.0, 1.0),
+            Color::from_hsv(0.0, 1.0, 1.0)
+        );
+        assert_eq!(
+            Colorf::from_hsva([1e30, 0.0, 0.0, f32::NAN]),
+            Colorf::from_hsva([1.0, 0.0, 0.0, 0.0])
+        );
+    }
+    #[test]
+    fn widget_state_from_raw() {
+        assert_eq!(
+            WidgetState::try_from_raw(sys::NK_WIDGET_ROM as u32),
+            Some(WidgetState::Rom)
+        );
+        assert_eq!(WidgetState::try_from_raw(99), None);
+    }
 }

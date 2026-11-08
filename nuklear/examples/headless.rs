@@ -13,7 +13,12 @@ impl Font for FixedFont {
         6.0 * text.chars().count() as f32
     }
     fn glyph(&self, _height: f32, _codepoint: char, _next: char) -> Glyph {
-        Glyph { width: 6.0, height: 12.0, xadvance: 6.0, ..Default::default() }
+        Glyph {
+            width: 6.0,
+            height: 12.0,
+            xadvance: 6.0,
+            ..Default::default()
+        }
     }
     fn texture(&self) -> Handle {
         Handle::id(1)
@@ -27,12 +32,22 @@ fn main() {
     // Build the frame: one window with a label, a button and a checkbox.
     let mut checked = false;
     ctx.input(|_| {});
-    ctx.window("Demo", Rect { x: 10.0, y: 10.0, w: 220.0, h: 160.0 }, PanelFlags::TITLE | PanelFlags::BORDER, |w| {
-        w.layout_row_dynamic(30.0, 1);
-        w.label("hello", TextAlign::LEFT);
-        w.button_label("Click");
-        w.checkbox("Check", &mut checked);
-    });
+    ctx.window(
+        "Demo",
+        Rect {
+            x: 10.0,
+            y: 10.0,
+            w: 220.0,
+            h: 160.0,
+        },
+        PanelFlags::TITLE | PanelFlags::BORDER,
+        |w| {
+            w.layout_row_dynamic(30.0, 1);
+            w.label("hello", TextAlign::LEFT);
+            w.button_label("Click");
+            w.checkbox("Check", &mut checked);
+        },
+    );
 
     // Print every draw command.
     for command in ctx.commands() {
@@ -50,10 +65,16 @@ fn main() {
         ],
     )
     .expect("the layout is valid");
-    let null = NullTexture { texture: Handle::id(1), uv: Vec2 { x: 0.5, y: 0.5 } };
+    let null = NullTexture {
+        texture: Handle::id(1),
+        uv: Vec2 { x: 0.5, y: 0.5 },
+    };
     let config = ConvertConfig::new(&layout, null);
     let (mut cmds, mut vertices, mut elements) = (Buffer::new(), Buffer::new(), Buffer::new());
-    let draw_commands = ctx.convert(&mut cmds, &mut vertices, &mut elements, &config).expect("convert failed").count();
+    let draw_commands = ctx
+        .convert(&mut cmds, &mut vertices, &mut elements, &config)
+        .expect("convert failed")
+        .count();
     println!("draw commands: {draw_commands}");
     println!("vertices: {}", vertices.len() / 20);
     println!("indices: {}", elements.as_indices().len());

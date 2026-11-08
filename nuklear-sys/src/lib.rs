@@ -33,7 +33,11 @@ use std::os::raw::{c_char, c_int};
 /// # Safety
 /// `expr` and `file` must each be null or point to a valid NUL-terminated string.
 #[no_mangle]
-pub unsafe extern "C" fn nk_rs_assert_fail(expr: *const c_char, file: *const c_char, line: c_int) -> ! {
+pub unsafe extern "C" fn nk_rs_assert_fail(
+    expr: *const c_char,
+    file: *const c_char,
+    line: c_int,
+) -> ! {
     let text = |p: *const c_char| {
         if p.is_null() {
             "?".into()
@@ -42,6 +46,11 @@ pub unsafe extern "C" fn nk_rs_assert_fail(expr: *const c_char, file: *const c_c
             unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
         }
     };
-    eprintln!("nuklear assertion failed: {} ({}:{})", text(expr), text(file), line);
+    eprintln!(
+        "nuklear assertion failed: {} ({}:{})",
+        text(expr),
+        text(file),
+        line
+    );
     std::process::abort()
 }

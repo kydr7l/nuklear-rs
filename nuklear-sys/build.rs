@@ -22,9 +22,16 @@ fn main() {
         .generate()
         .expect("bindgen failed");
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
-    bindings.write_to_file(out.join("bindings.rs")).expect("cannot write bindings.rs");
+    bindings
+        .write_to_file(out.join("bindings.rs"))
+        .expect("cannot write bindings.rs");
 
-    for f in ["src/nuklear.c", "src/config.h", "src/wrapper.h", "nuklear/nuklear.h"] {
+    for f in [
+        "src/nuklear.c",
+        "src/config.h",
+        "src/wrapper.h",
+        "nuklear/nuklear.h",
+    ] {
         println!("cargo:rerun-if-changed={f}");
     }
 }

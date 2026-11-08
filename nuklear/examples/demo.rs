@@ -53,7 +53,12 @@ impl Demo {
             progress: 40,
             property: 20,
             combo: 0,
-            color: Colorf { r: 0.4, g: 0.6, b: 0.9, a: 1.0 },
+            color: Colorf {
+                r: 0.4,
+                g: 0.6,
+                b: 0.9,
+                a: 1.0,
+            },
             selected: [false, true, false, false],
             popup: false,
             text,
@@ -63,52 +68,104 @@ impl Demo {
 
 fn ui(ctx: &mut Context<'_>, d: &mut Demo, size: (f32, f32)) {
     d.time += 0.05;
-    let flags = PanelFlags::BORDER | PanelFlags::MOVABLE | PanelFlags::SCALABLE | PanelFlags::MINIMIZABLE | PanelFlags::TITLE;
-    let bounds = Rect { x: 20.0, y: 20.0, w: 380.0, h: (size.1 - 40.0).clamp(200.0, 620.0) };
+    let flags = PanelFlags::BORDER
+        | PanelFlags::MOVABLE
+        | PanelFlags::SCALABLE
+        | PanelFlags::MINIMIZABLE
+        | PanelFlags::TITLE;
+    let bounds = Rect {
+        x: 20.0,
+        y: 20.0,
+        w: 380.0,
+        h: (size.1 - 40.0).clamp(200.0, 620.0),
+    };
     ctx.window("Overview", bounds, flags, |w| {
         menubar(w, d);
-        w.tree(TreeType::Tab, "Widgets", CollapseState::Maximized, 0, |w| basic(w, d));
-        w.tree(TreeType::Tab, "Popup and contextual menu", CollapseState::Minimized, 1, |w| popups(w, d));
-        w.tree(TreeType::Tab, "Layout", CollapseState::Minimized, 2, |w| layouts(w, d));
-        w.tree(TreeType::Tab, "Charts", CollapseState::Minimized, 3, |w| charts(w, d));
-        w.tree(TreeType::Tab, "Input", CollapseState::Minimized, 4, |w| input(w, d));
+        w.tree(TreeType::Tab, "Widgets", CollapseState::Maximized, 0, |w| {
+            basic(w, d)
+        });
+        w.tree(
+            TreeType::Tab,
+            "Popup and contextual menu",
+            CollapseState::Minimized,
+            1,
+            |w| popups(w, d),
+        );
+        w.tree(TreeType::Tab, "Layout", CollapseState::Minimized, 2, |w| {
+            layouts(w, d)
+        });
+        w.tree(TreeType::Tab, "Charts", CollapseState::Minimized, 3, |w| {
+            charts(w, d)
+        });
+        w.tree(TreeType::Tab, "Input", CollapseState::Minimized, 4, |w| {
+            input(w, d)
+        });
         w.layout_row_dynamic(20.0, 1);
         w.label(&format!("Status: {}", d.status), TextAlign::LEFT);
     });
-    ctx.window("Info", Rect { x: 420.0, y: 20.0, w: 240.0, h: 150.0 }, flags, |w| {
-        w.layout_row_dynamic(22.0, 1);
-        w.label("A window you can drag.", TextAlign::LEFT);
-        w.label_colored("Colored text", TextAlign::LEFT, Color { r: 255, g: 200, b: 60, a: 255 });
-        w.label(&format!("Slider: {:.2}", d.slider), TextAlign::LEFT);
-        w.label(&format!("Checkbox: {}", d.checked), TextAlign::LEFT);
-    });
+    ctx.window(
+        "Info",
+        Rect {
+            x: 420.0,
+            y: 20.0,
+            w: 240.0,
+            h: 150.0,
+        },
+        flags,
+        |w| {
+            w.layout_row_dynamic(22.0, 1);
+            w.label("A window you can drag.", TextAlign::LEFT);
+            w.label_colored(
+                "Colored text",
+                TextAlign::LEFT,
+                Color {
+                    r: 255,
+                    g: 200,
+                    b: 60,
+                    a: 255,
+                },
+            );
+            w.label(&format!("Slider: {:.2}", d.slider), TextAlign::LEFT);
+            w.label(&format!("Checkbox: {}", d.checked), TextAlign::LEFT);
+        },
+    );
 }
 
 fn menubar(w: &mut Window<'_, '_>, d: &mut Demo) {
     w.menubar(|m| {
         m.layout_row_begin(LayoutFormat::Static, 25.0, 2);
         m.layout_row_push(45.0);
-        m.menu_label("File", TextAlign::LEFT, Vec2 { x: 120.0, y: 100.0 }, |menu| {
-            menu.layout_row_dynamic(25.0, 1);
-            if menu.item_label("New", TextAlign::LEFT) {
-                d.status = "File > New".into();
-            }
-            if menu.item_label("Open", TextAlign::LEFT) {
-                d.status = "File > Open".into();
-            }
-            if menu.item_label("Quit", TextAlign::LEFT) {
-                d.quit = true;
-            }
-        });
-        m.layout_row_push(45.0);
-        m.menu_label("Edit", TextAlign::LEFT, Vec2 { x: 120.0, y: 100.0 }, |menu| {
-            menu.layout_row_dynamic(25.0, 1);
-            for name in ["Copy", "Cut", "Paste"] {
-                if menu.item_label(name, TextAlign::LEFT) {
-                    d.status = format!("Edit > {name}");
+        m.menu_label(
+            "File",
+            TextAlign::LEFT,
+            Vec2 { x: 120.0, y: 100.0 },
+            |menu| {
+                menu.layout_row_dynamic(25.0, 1);
+                if menu.item_label("New", TextAlign::LEFT) {
+                    d.status = "File > New".into();
                 }
-            }
-        });
+                if menu.item_label("Open", TextAlign::LEFT) {
+                    d.status = "File > Open".into();
+                }
+                if menu.item_label("Quit", TextAlign::LEFT) {
+                    d.quit = true;
+                }
+            },
+        );
+        m.layout_row_push(45.0);
+        m.menu_label(
+            "Edit",
+            TextAlign::LEFT,
+            Vec2 { x: 120.0, y: 100.0 },
+            |menu| {
+                menu.layout_row_dynamic(25.0, 1);
+                for name in ["Copy", "Cut", "Paste"] {
+                    if menu.item_label(name, TextAlign::LEFT) {
+                        d.status = format!("Edit > {name}");
+                    }
+                }
+            },
+        );
         m.layout_row_end();
     });
 }
@@ -134,9 +191,19 @@ fn basic(w: &mut Window<'_, '_>, d: &mut Demo) {
     w.progress(&mut d.progress, 100, true);
     w.property_i32("Compression:", 0, &mut d.property, 100, 10, 1.0);
     w.layout_row_dynamic(25.0, 1);
-    w.combo(&["Item 1", "Item 2", "Item 3"], &mut d.combo, 25, Vec2 { x: 200.0, y: 200.0 });
+    w.combo(
+        &["Item 1", "Item 2", "Item 3"],
+        &mut d.combo,
+        25,
+        Vec2 { x: 200.0, y: 200.0 },
+    );
     let c = d.color;
-    let swatch = Color { r: (c.r * 255.0) as u8, g: (c.g * 255.0) as u8, b: (c.b * 255.0) as u8, a: (c.a * 255.0) as u8 };
+    let swatch = Color {
+        r: (c.r * 255.0) as u8,
+        g: (c.g * 255.0) as u8,
+        b: (c.b * 255.0) as u8,
+        a: (c.a * 255.0) as u8,
+    };
     let width = w.widget_bounds().w;
     w.combo_color(swatch, Vec2 { x: width, y: 300.0 }, |c| {
         c.layout_row_dynamic(120.0, 1);
@@ -160,33 +227,49 @@ fn popups(w: &mut Window<'_, '_>, d: &mut Demo) {
     }
     if d.popup {
         let flags = PanelFlags::CLOSABLE | PanelFlags::MOVABLE | PanelFlags::TITLE;
-        let open = w.popup(PopupType::Static, "Popup", flags, Rect { x: 20.0, y: 20.0, w: 220.0, h: 90.0 }, |p| {
-            p.layout_row_dynamic(25.0, 1);
-            p.label("A popup window.", TextAlign::LEFT);
-            p.layout_row_dynamic(25.0, 2);
-            if p.button_label("OK") {
-                d.popup = false;
-                p.close();
-            }
-            if p.button_label("Cancel") {
-                d.popup = false;
-                p.close();
-            }
-        });
+        let open = w.popup(
+            PopupType::Static,
+            "Popup",
+            flags,
+            Rect {
+                x: 20.0,
+                y: 20.0,
+                w: 220.0,
+                h: 90.0,
+            },
+            |p| {
+                p.layout_row_dynamic(25.0, 1);
+                p.label("A popup window.", TextAlign::LEFT);
+                p.layout_row_dynamic(25.0, 2);
+                if p.button_label("OK") {
+                    d.popup = false;
+                    p.close();
+                }
+                if p.button_label("Cancel") {
+                    d.popup = false;
+                    p.close();
+                }
+            },
+        );
         // The user closed the popup with its title bar button.
         d.popup &= open.is_some();
     }
     w.layout_row_dynamic(80.0, 1);
     let area = w.widget_bounds();
     w.label("Right click here for a menu.", TextAlign::LEFT);
-    w.contextual(PanelFlags::empty(), Vec2 { x: 120.0, y: 100.0 }, area, |c| {
-        c.layout_row_dynamic(25.0, 1);
-        for name in ["Open", "Save", "Close"] {
-            if c.item_label(name, TextAlign::LEFT) {
-                d.status = format!("Context menu: {name}");
+    w.contextual(
+        PanelFlags::empty(),
+        Vec2 { x: 120.0, y: 100.0 },
+        area,
+        |c| {
+            c.layout_row_dynamic(25.0, 1);
+            for name in ["Open", "Save", "Close"] {
+                if c.item_label(name, TextAlign::LEFT) {
+                    d.status = format!("Context menu: {name}");
+                }
             }
-        }
-    });
+        },
+    );
 }
 
 fn layouts(w: &mut Window<'_, '_>, _d: &mut Demo) {
@@ -222,7 +305,9 @@ fn charts(w: &mut Window<'_, '_>, d: &mut Demo) {
             c.push((i as f32 * 0.25 + d.time).sin());
         }
     });
-    let columns: Vec<f32> = (0..16).map(|i| ((i as f32 * 0.5 + d.time).cos() + 1.0) * 5.0).collect();
+    let columns: Vec<f32> = (0..16)
+        .map(|i| ((i as f32 * 0.5 + d.time).cos() + 1.0) * 5.0)
+        .collect();
     w.plot(ChartType::Column, &columns, 0);
 }
 
@@ -248,7 +333,16 @@ type Vertex = [f32; 8];
 
 fn vertex(bytes: &[u8]) -> Vertex {
     let f = |o: usize| f32::from_ne_bytes(bytes[o..o + 4].try_into().unwrap());
-    [f(0), f(4), f(8), f(12), bytes[16] as f32, bytes[17] as f32, bytes[18] as f32, bytes[19] as f32]
+    [
+        f(0),
+        f(4),
+        f(8),
+        f(12),
+        bytes[16] as f32,
+        bytes[17] as f32,
+        bytes[18] as f32,
+        bytes[19] as f32,
+    ]
 }
 
 /// Fill a triangle inside `clip` (x0, y0, x1, y1) and blend it over the pixels of `fb`.
@@ -259,8 +353,14 @@ fn triangle(fb: &mut [u32], width: usize, clip: [usize; 4], atlas: &Atlas, [a, b
     }
     let min = |i: usize| a[i].min(b[i]).min(c[i]);
     let max = |i: usize| a[i].max(b[i]).max(c[i]);
-    let (x0, x1) = ((min(0).floor() as usize).max(clip[0]), (max(0).ceil() as usize).min(clip[2]));
-    let (y0, y1) = ((min(1).floor() as usize).max(clip[1]), (max(1).ceil() as usize).min(clip[3]));
+    let (x0, x1) = (
+        (min(0).floor() as usize).max(clip[0]),
+        (max(0).ceil() as usize).min(clip[2]),
+    );
+    let (y0, y1) = (
+        (min(1).floor() as usize).max(clip[1]),
+        (max(1).ceil() as usize).min(clip[3]),
+    );
     for y in y0..y1 {
         for x in x0..x1 {
             let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
@@ -285,12 +385,24 @@ fn triangle(fb: &mut [u32], width: usize, clip: [usize; 4], atlas: &Atlas, [a, b
     }
 }
 
-fn raster(fb: &mut [u32], (w, h): (usize, usize), atlas: &Atlas, vertices: &[u8], indices: &[u16], draws: &[DrawCommand]) {
+fn raster(
+    fb: &mut [u32],
+    (w, h): (usize, usize),
+    atlas: &Atlas,
+    vertices: &[u8],
+    indices: &[u16],
+    draws: &[DrawCommand],
+) {
     let mut at = 0;
     for d in draws {
         let n = d.elem_count as usize;
         let r = d.clip_rect;
-        let clip = [r.x.floor() as usize, r.y.floor() as usize, ((r.x + r.w).ceil() as usize).min(w), ((r.y + r.h).ceil() as usize).min(h)];
+        let clip = [
+            r.x.floor() as usize,
+            r.y.floor() as usize,
+            ((r.x + r.w).ceil() as usize).min(w),
+            ((r.y + r.h).ceil() as usize).min(h),
+        ];
         for t in indices[at..at + n].chunks_exact(3) {
             let v = |i: u16| vertex(&vertices[i as usize * VERTEX_SIZE..][..VERTEX_SIZE]);
             triangle(fb, w, clip, atlas, [v(t[0]), v(t[1]), v(t[2])]);
@@ -328,9 +440,13 @@ struct App<'f> {
 
 impl App<'_> {
     fn frame(&mut self, event_loop: &ActiveEventLoop) {
-        let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else { return };
+        let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else {
+            return;
+        };
         let size = window.inner_size();
-        let (Some(w), Some(h)) = (NonZeroU32::new(size.width), NonZeroU32::new(size.height)) else { return };
+        let (Some(w), Some(h)) = (NonZeroU32::new(size.width), NonZeroU32::new(size.height)) else {
+            return;
+        };
         surface.resize(w, h).expect("cannot resize the surface");
 
         let events = std::mem::take(&mut self.events);
@@ -345,15 +461,30 @@ impl App<'_> {
                 }
             }
         });
-        ui(&mut self.ctx, &mut self.demo, (size.width as f32, size.height as f32));
+        ui(
+            &mut self.ctx,
+            &mut self.demo,
+            (size.width as f32, size.height as f32),
+        );
 
         let [cmds, vertices, elements] = &mut self.buffers;
         let config = ConvertConfig::new(&self.layout, self.null);
-        let draws: Vec<DrawCommand> = self.ctx.convert(cmds, vertices, elements, &config).expect("cannot convert the frame").collect();
+        let draws: Vec<DrawCommand> = self
+            .ctx
+            .convert(cmds, vertices, elements, &config)
+            .expect("cannot convert the frame")
+            .collect();
         let mut buffer = surface.buffer_mut().expect("cannot get the pixel buffer");
         let [r, g, b] = BACKGROUND.map(|c| c as u32);
         buffer.fill(r << 16 | g << 8 | b);
-        raster(&mut buffer, (size.width as usize, size.height as usize), &self.atlas, vertices.as_bytes(), elements.as_indices(), &draws);
+        raster(
+            &mut buffer,
+            (size.width as usize, size.height as usize),
+            &self.atlas,
+            vertices.as_bytes(),
+            elements.as_indices(),
+            &draws,
+        );
         buffer.present().expect("cannot show the frame");
 
         self.ctx.clear();
@@ -385,10 +516,17 @@ impl App<'_> {
 
 impl ApplicationHandler for App<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let attributes = Win::default_attributes().with_title("nuklear-rs demo").with_inner_size(PhysicalSize::new(900, 680));
-        let window = Rc::new(event_loop.create_window(attributes).expect("cannot make the window"));
+        let attributes = Win::default_attributes()
+            .with_title("nuklear-rs demo")
+            .with_inner_size(PhysicalSize::new(900, 680));
+        let window = Rc::new(
+            event_loop
+                .create_window(attributes)
+                .expect("cannot make the window"),
+        );
         let context = SbContext::new(window.clone()).expect("cannot make the display context");
-        self.surface = Some(Surface::new(&context, window.clone()).expect("cannot make the surface"));
+        self.surface =
+            Some(Surface::new(&context, window.clone()).expect("cannot make the surface"));
         self.window = Some(window);
     }
 
@@ -398,8 +536,10 @@ impl ApplicationHandler for App<'_> {
             WindowEvent::RedrawRequested => self.frame(event_loop),
             WindowEvent::ModifiersChanged(m) => {
                 self.modifiers = m.state();
-                self.events.push(Event::Key(Key::Shift, self.modifiers.shift_key()));
-                self.events.push(Event::Key(Key::Ctrl, self.modifiers.control_key()));
+                self.events
+                    .push(Event::Key(Key::Shift, self.modifiers.shift_key()));
+                self.events
+                    .push(Event::Key(Key::Ctrl, self.modifiers.control_key()));
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.mouse = (position.x as i32, position.y as i32);
@@ -412,12 +552,20 @@ impl ApplicationHandler for App<'_> {
                     MouseButton::Right => Button::Right,
                     _ => return,
                 };
-                self.events.push(Event::Button(button, self.mouse.0, self.mouse.1, state == ElementState::Pressed));
+                self.events.push(Event::Button(
+                    button,
+                    self.mouse.0,
+                    self.mouse.1,
+                    state == ElementState::Pressed,
+                ));
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 let delta = match delta {
                     MouseScrollDelta::LineDelta(x, y) => Vec2 { x, y },
-                    MouseScrollDelta::PixelDelta(p) => Vec2 { x: p.x as f32 / 20.0, y: p.y as f32 / 20.0 },
+                    MouseScrollDelta::PixelDelta(p) => Vec2 {
+                        x: p.x as f32 / 20.0,
+                        y: p.y as f32 / 20.0,
+                    },
                 };
                 self.events.push(Event::Scroll(delta));
             }
@@ -446,9 +594,17 @@ impl ApplicationHandler for App<'_> {
 
 fn main() {
     let mut builder = FontAtlasBuilder::new();
-    let font_id = builder.add_default(13.0).expect("cannot add the default font");
-    let baked = builder.bake(AtlasFormat::Alpha8).expect("cannot bake the font atlas");
-    let atlas = Atlas { w: baked.width() as usize, h: baked.height() as usize, alpha: baked.pixels().to_vec() };
+    let font_id = builder
+        .add_default(13.0)
+        .expect("cannot add the default font");
+    let baked = builder
+        .bake(AtlasFormat::Alpha8)
+        .expect("cannot bake the font atlas");
+    let atlas = Atlas {
+        w: baked.width() as usize,
+        h: baked.height() as usize,
+        alpha: baked.pixels().to_vec(),
+    };
     let (font_atlas, null) = baked.end(Handle::id(1));
     let font = font_atlas.font(font_id).expect("the font is in the atlas");
     let ctx = Context::new(&font).expect("cannot make the context");

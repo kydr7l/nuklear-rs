@@ -1,6 +1,9 @@
 //! The Nuklear context, the input scope and the window scope.
 
-use crate::{cstr, sys, text_arg, Button, CollapseState, Color, FontHandle, Key, PanelFlags, Rect, ShowState, UserFont, Vec2, Window};
+use crate::{
+    cstr, sys, text_arg, Button, CollapseState, Color, FontHandle, Key, PanelFlags, Rect,
+    ShowState, UserFont, Vec2, Window,
+};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -86,7 +89,12 @@ impl<'f> Context<'f> {
         // SAFETY: `p` comes from `Box::into_raw`. The font pointer stays valid for the life of the context, see `new` and `with_font`.
         // `nk_init` copies the allocator. Its slack bytes hold the aligned command writes that the grow path of `nk_buffer_alloc` can put past a block.
         // After `nk_init`, the command memory is allocated or null. The page pool allocates nothing yet.
-        let (ok, mem) = unsafe { (sys::nk_init(p, &crate::convert::slack_allocator(), font), (*p).memory.memory.ptr) };
+        let (ok, mem) = unsafe {
+            (
+                sys::nk_init(p, &crate::convert::slack_allocator(), font),
+                (*p).memory.memory.ptr,
+            )
+        };
         // With a null block, Nuklear would write through a null pointer, because the size is already set. Nothing else needs a free.
         if !ok || mem.is_null() {
             // SAFETY: `p` comes from `Box::into_raw`, and no other owner exists.
@@ -200,7 +208,15 @@ impl<'f> Context<'f> {
         }
         let (name, title) = (cstr(name), cstr(title));
         // SAFETY: the context is valid, and both strings end with NUL. Nuklear copies the strings.
-        let open = unsafe { sys::nk_begin_titled(self.raw(), name.as_ptr(), title.as_ptr(), bounds.into(), flags.c_bits()) };
+        let open = unsafe {
+            sys::nk_begin_titled(
+                self.raw(),
+                name.as_ptr(),
+                title.as_ptr(),
+                bounds.into(),
+                flags.c_bits(),
+            )
+        };
         if !open {
             self.reset_hidden_buffer();
         }
@@ -230,7 +246,12 @@ impl<'f> Context<'f> {
             buffer.begin = at;
             buffer.end = at;
             buffer.last = at;
-            buffer.clip = sys::nk_rect { x: -8192.0, y: -8192.0, w: 16384.0, h: 16384.0 }; // This is `nk_null_rect`.
+            buffer.clip = sys::nk_rect {
+                x: -8192.0,
+                y: -8192.0,
+                w: 16384.0,
+                h: 16384.0,
+            }; // This is `nk_null_rect`.
         }
     }
 
@@ -238,7 +259,10 @@ impl<'f> Context<'f> {
     ///
     /// `nk_build` links the popup commands of each window with this flag. The loop checks neither `HIDDEN` nor `seq`.
     /// So an old flag would link offsets of an old frame, or write through a null command pointer.
-    fn drop_popup_buffers(&mut self, keep: impl Fn(*const sys::nk_window, &sys::nk_context) -> bool) {
+    fn drop_popup_buffers(
+        &mut self,
+        keep: impl Fn(*const sys::nk_window, &sys::nk_context) -> bool,
+    ) {
         let c = self.raw();
         // SAFETY: the context is valid. The window list holds valid windows or ends with null. `self` is borrowed mutably.
         unsafe {
@@ -262,7 +286,11 @@ impl<'f> Context<'f> {
         // A popup flag stays set when a window is hidden after its popup, or has no commands. `nk_build` cannot link such a popup.
         self.drop_popup_buffers(|win, c| {
             // SAFETY: `win` is a valid window of the list.
-            unsafe { (*win).flags & sys::NK_WINDOW_HIDDEN as u32 == 0 && (*win).seq == c.seq && (*win).buffer.last != (*win).buffer.begin }
+            unsafe {
+                (*win).flags & sys::NK_WINDOW_HIDDEN as u32 == 0
+                    && (*win).seq == c.seq
+                    && (*win).buffer.last != (*win).buffer.begin
+            }
         });
         self.frame_built = true;
     }
@@ -379,7 +407,9 @@ impl<'f> Context<'f> {
         // `ptr` points to `len` readable bytes. The width callback is the one that the font set.
         unsafe {
             let font = (*self.raw_const()).style.font;
-            (*font).width.map_or(0.0, |width| width((*font).userdata, (*font).height, ptr, len))
+            (*font).width.map_or(0.0, |width| {
+                width((*font).userdata, (*font).height, ptr, len)
+            })
         }
     }
 

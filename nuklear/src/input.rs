@@ -84,7 +84,9 @@ impl InputState<'_> {
     /// Check if `button` went to the state `down` at a position inside `rect`, and stays in that state.
     pub fn has_mouse_click_down_in_rect(&self, button: Button, rect: Rect, down: bool) -> bool {
         // SAFETY: the input is valid for the life of `self`, and `button` is a valid button value.
-        unsafe { sys::nk_input_has_mouse_click_down_in_rect(self.0, button.raw() as _, rect.into(), down) }
+        unsafe {
+            sys::nk_input_has_mouse_click_down_in_rect(self.0, button.raw() as _, rect.into(), down)
+        }
     }
 
     /// Check if the mouse is over `rect`.

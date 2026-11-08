@@ -20,19 +20,29 @@ impl TextEdit {
         // SAFETY: `p` comes from `Box::into_raw`, so it is valid and unique.
         unsafe { sys::nk_textedit_init_default(p) };
         // SAFETY: `Box::into_raw` never returns a null pointer.
-        TextEdit { raw: unsafe { NonNull::new_unchecked(p) } }
+        TextEdit {
+            raw: unsafe { NonNull::new_unchecked(p) },
+        }
     }
 
     /// Get a copy of the text. The method replaces invalid UTF-8 bytes.
     pub fn text(&self) -> String {
         let p = self.raw.as_ptr();
         // SAFETY: `p` is valid. The string field is initialized.
-        let (ptr, len) = unsafe { (sys::nk_str_get_const(addr_of!((*p).string)), sys::nk_str_len_char(addr_of!((*p).string))) };
+        let (ptr, len) = unsafe {
+            (
+                sys::nk_str_get_const(addr_of!((*p).string)),
+                sys::nk_str_len_char(addr_of!((*p).string)),
+            )
+        };
         if ptr.is_null() || len <= 0 {
             return String::new();
         }
         // SAFETY: Nuklear returns the buffer start and the byte length of the same string. The borrow ends in this function.
-        String::from_utf8_lossy(unsafe { std::slice::from_raw_parts(ptr.cast::<u8>(), len as usize) }).into_owned()
+        String::from_utf8_lossy(unsafe {
+            std::slice::from_raw_parts(ptr.cast::<u8>(), len as usize)
+        })
+        .into_owned()
     }
 
     /// Replace the text. The method resets the cursor, the selection and the undo history.

@@ -3,7 +3,10 @@
 //! Every text method passes the pointer and the length of the Rust string to a Nuklear `_text` function.
 //! None of these functions reads the string up to a NUL byte.
 
-use crate::{cstr, EditEvents, EditFlags, Filter, StyleButton, TextEdit, sys, text_arg, ButtonBehavior, ChartType, Color, ColorFormat, Colorf, Heading, Image, Symbol, TextAlign, Window};
+use crate::{
+    cstr, sys, text_arg, ButtonBehavior, ChartType, Color, ColorFormat, Colorf, EditEvents,
+    EditFlags, Filter, Heading, Image, StyleButton, Symbol, TextAlign, TextEdit, Window,
+};
 use std::ffi::c_int;
 
 /// The largest absolute value of a float property, exclusive. `nk_dtoa` casts the value to `int` and
@@ -22,7 +25,13 @@ impl<'a, 'f> Window<'a, 'f> {
     /// Nuklear keeps the cursor and the selection of the active field in the window, so `text` can be a new `String` each frame.
     /// The method cuts a longer `text` at a character boundary, and it limits `max` to 2^30.
     /// The widget drops the characters that `filter` rejects.
-    pub fn edit_string(&mut self, flags: EditFlags, text: &mut String, max: usize, filter: Filter) -> EditEvents {
+    pub fn edit_string(
+        &mut self,
+        flags: EditFlags,
+        text: &mut String,
+        max: usize,
+        filter: Filter,
+    ) -> EditEvents {
         let max = max.min(crate::TEXT_LIMIT);
         let mut n = text.len().min(max);
         while !text.is_char_boundary(n) {
@@ -34,7 +43,16 @@ impl<'a, 'f> Window<'a, 'f> {
         let mut len = n as c_int;
         // SAFETY: the context is valid, a window is open, and `buf` is writable for `max + 1` bytes, which fits in an `int`.
         // `len` is at most `max`. Nuklear uses the buffer only during the call, as a fixed string that it does not grow.
-        let r = unsafe { sys::nk_edit_string(self.raw(), flags.bits(), buf.as_mut_ptr().cast(), &mut len, (max + 1) as c_int, filter.raw()) };
+        let r = unsafe {
+            sys::nk_edit_string(
+                self.raw(),
+                flags.bits(),
+                buf.as_mut_ptr().cast(),
+                &mut len,
+                (max + 1) as c_int,
+                filter.raw(),
+            )
+        };
         let len = usize::try_from(len).unwrap_or(0).min(max);
         *text = String::from_utf8_lossy(&buf[..len]).into_owned();
         EditEvents::from_bits(r)
@@ -138,7 +156,9 @@ impl<'a, 'f> Window<'a, 'f> {
     pub fn button_image_label(&mut self, img: Image, text: &str, align: TextAlign) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, and `ptr` points to `len` readable bytes.
-        unsafe { sys::nk_button_image_text(self.raw(), sys::nk_image::from(img), ptr, len, align.bits()) }
+        unsafe {
+            sys::nk_button_image_text(self.raw(), sys::nk_image::from(img), ptr, len, align.bits())
+        }
     }
 
     /// Set the behavior of the buttons that follow.
@@ -190,18 +210,48 @@ impl<'a, 'f> Window<'a, 'f> {
 
     /// Show a selectable text with an image. The method returns `true` when the user changed `value`.
     /// The method uses only the first 2^30 bytes of the text.
-    pub fn selectable_image(&mut self, img: Image, text: &str, align: TextAlign, value: &mut bool) -> bool {
+    pub fn selectable_image(
+        &mut self,
+        img: Image,
+        text: &str,
+        align: TextAlign,
+        value: &mut bool,
+    ) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `value` is writable.
-        unsafe { sys::nk_selectable_image_text(self.raw(), sys::nk_image::from(img), ptr, len, align.bits(), value) }
+        unsafe {
+            sys::nk_selectable_image_text(
+                self.raw(),
+                sys::nk_image::from(img),
+                ptr,
+                len,
+                align.bits(),
+                value,
+            )
+        }
     }
 
     /// Show a selectable text with a symbol. The method returns `true` when the user changed `value`.
     /// The method uses only the first 2^30 bytes of the text.
-    pub fn selectable_symbol(&mut self, symbol: Symbol, text: &str, align: TextAlign, value: &mut bool) -> bool {
+    pub fn selectable_symbol(
+        &mut self,
+        symbol: Symbol,
+        text: &str,
+        align: TextAlign,
+        value: &mut bool,
+    ) -> bool {
         let (ptr, len) = text_arg(text);
         // SAFETY: the context is valid, a window is open, `ptr` points to `len` readable bytes, and `value` is writable.
-        unsafe { sys::nk_selectable_symbol_text(self.raw(), symbol.raw() as _, ptr, len, align.bits(), value) }
+        unsafe {
+            sys::nk_selectable_symbol_text(
+                self.raw(),
+                symbol.raw() as _,
+                ptr,
+                len,
+                align.bits(),
+                value,
+            )
+        }
     }
 
     /// Show a slider. The method returns `true` when the user changed `value`.
@@ -226,22 +276,63 @@ impl<'a, 'f> Window<'a, 'f> {
 
     /// Show a knob. The method returns `true` when the user changed `value`.
     /// The method does nothing and returns `false` when `step <= 0`, `min >= max`, or a number is not finite.
-    pub fn knob_f32(&mut self, min: f32, value: &mut f32, max: f32, step: f32, zero: Heading, dead_zone_degrees: f32) -> bool {
-        if step <= 0.0 || min >= max || ![min, *value, max, step, dead_zone_degrees].iter().all(|v| v.is_finite()) {
+    pub fn knob_f32(
+        &mut self,
+        min: f32,
+        value: &mut f32,
+        max: f32,
+        step: f32,
+        zero: Heading,
+        dead_zone_degrees: f32,
+    ) -> bool {
+        if step <= 0.0
+            || min >= max
+            || ![min, *value, max, step, dead_zone_degrees]
+                .iter()
+                .all(|v| v.is_finite())
+        {
             return false;
         }
         // SAFETY: the context is valid, a window is open, and `value` is writable.
-        unsafe { sys::nk_knob_float(self.raw(), min, value, max, step, zero.raw() as _, dead_zone_degrees) }
+        unsafe {
+            sys::nk_knob_float(
+                self.raw(),
+                min,
+                value,
+                max,
+                step,
+                zero.raw() as _,
+                dead_zone_degrees,
+            )
+        }
     }
 
     /// Show a knob. The method returns `true` when the user changed `value`.
     /// The method does nothing and returns `false` when `step <= 0`, `min >= max`, or `dead_zone_degrees` is not finite.
-    pub fn knob_i32(&mut self, min: i32, value: &mut i32, max: i32, step: i32, zero: Heading, dead_zone_degrees: f32) -> bool {
+    pub fn knob_i32(
+        &mut self,
+        min: i32,
+        value: &mut i32,
+        max: i32,
+        step: i32,
+        zero: Heading,
+        dead_zone_degrees: f32,
+    ) -> bool {
         if step <= 0 || min >= max || !dead_zone_degrees.is_finite() {
             return false;
         }
         // SAFETY: the context is valid, a window is open, and `value` is writable.
-        unsafe { sys::nk_knob_int(self.raw(), min, value, max, step, zero.raw() as _, dead_zone_degrees) }
+        unsafe {
+            sys::nk_knob_int(
+                self.raw(),
+                min,
+                value,
+                max,
+                step,
+                zero.raw() as _,
+                dead_zone_degrees,
+            )
+        }
     }
 
     /// Show a progress bar. The method returns `true` when the user changed `current`.
@@ -265,39 +356,100 @@ impl<'a, 'f> Window<'a, 'f> {
 
     /// Show an integer property. The method returns `true` when the user changed `value`.
     /// The method does nothing and returns `false` when `min > max` or `inc_per_pixel` is not finite.
-    pub fn property_i32(&mut self, name: &str, min: i32, value: &mut i32, max: i32, step: i32, inc_per_pixel: f32) -> bool {
+    pub fn property_i32(
+        &mut self,
+        name: &str,
+        min: i32,
+        value: &mut i32,
+        max: i32,
+        step: i32,
+        inc_per_pixel: f32,
+    ) -> bool {
         if min > max || !inc_per_pixel.is_finite() {
             return false;
         }
         let name = cstr(name);
         // SAFETY: the context is valid, a window is open, `name` ends with NUL, and `value` is writable.
-        unsafe { sys::nk_property_int(self.raw(), name.as_ptr(), min, value, max, step, inc_per_pixel) }
+        unsafe {
+            sys::nk_property_int(
+                self.raw(),
+                name.as_ptr(),
+                min,
+                value,
+                max,
+                step,
+                inc_per_pixel,
+            )
+        }
     }
 
     /// Show a `f32` property. The method returns `true` when the user changed `value`.
     /// The method does nothing and returns `false` when `min > max`, a number is not finite,
     /// or `min`, `max` or `value` has an absolute value of 2^31 or more.
-    pub fn property_f32(&mut self, name: &str, min: f32, value: &mut f32, max: f32, step: f32, inc_per_pixel: f32) -> bool {
+    pub fn property_f32(
+        &mut self,
+        name: &str,
+        min: f32,
+        value: &mut f32,
+        max: f32,
+        step: f32,
+        inc_per_pixel: f32,
+    ) -> bool {
         let in_range = |v: f32| v.abs() < PROPERTY_LIMIT;
-        if min > max || ![step, inc_per_pixel].iter().all(|v| v.is_finite()) || !(in_range(min) && in_range(*value) && in_range(max)) {
+        if min > max
+            || ![step, inc_per_pixel].iter().all(|v| v.is_finite())
+            || !(in_range(min) && in_range(*value) && in_range(max))
+        {
             return false;
         }
         let name = cstr(name);
         // SAFETY: the context is valid, a window is open, `name` ends with NUL, and `value` is writable.
-        unsafe { sys::nk_property_float(self.raw(), name.as_ptr(), min, value, max, step, inc_per_pixel) }
+        unsafe {
+            sys::nk_property_float(
+                self.raw(),
+                name.as_ptr(),
+                min,
+                value,
+                max,
+                step,
+                inc_per_pixel,
+            )
+        }
     }
 
     /// Show a `f64` property. The method returns `true` when the user changed `value`.
     /// The method does nothing and returns `false` when `min > max`, a number is not finite,
     /// or `min`, `max` or `value` has an absolute value of 2^31 or more.
-    pub fn property_f64(&mut self, name: &str, min: f64, value: &mut f64, max: f64, step: f64, inc_per_pixel: f32) -> bool {
+    pub fn property_f64(
+        &mut self,
+        name: &str,
+        min: f64,
+        value: &mut f64,
+        max: f64,
+        step: f64,
+        inc_per_pixel: f32,
+    ) -> bool {
         let in_range = |v: f64| v.abs() < f64::from(PROPERTY_LIMIT);
-        if min > max || !step.is_finite() || !inc_per_pixel.is_finite() || !(in_range(min) && in_range(*value) && in_range(max)) {
+        if min > max
+            || !step.is_finite()
+            || !inc_per_pixel.is_finite()
+            || !(in_range(min) && in_range(*value) && in_range(max))
+        {
             return false;
         }
         let name = cstr(name);
         // SAFETY: the context is valid, a window is open, `name` ends with NUL, and `value` is writable.
-        unsafe { sys::nk_property_double(self.raw(), name.as_ptr(), min, value, max, step, inc_per_pixel) }
+        unsafe {
+            sys::nk_property_double(
+                self.raw(),
+                name.as_ptr(),
+                min,
+                value,
+                max,
+                step,
+                inc_per_pixel,
+            )
+        }
     }
 
     /// Show a chart of `values` from the index `offset`. The method does nothing when no value is left
@@ -310,7 +462,9 @@ impl<'a, 'f> Window<'a, 'f> {
         if !values.iter().all(|v| v.is_finite()) {
             return;
         }
-        let (mut min, mut max) = values.iter().fold((first, first), |(lo, hi), &v| (lo.min(v), hi.max(v)));
+        let (mut min, mut max) = values
+            .iter()
+            .fold((first, first), |(lo, hi), &v| (lo.min(v), hi.max(v)));
         // `nk_plot` would divide by `max - min`, and the chart rejects an empty range.
         if min == max {
             (min, max) = (min - 0.5, max + 0.5);

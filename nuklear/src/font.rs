@@ -3,8 +3,8 @@
 use crate::{sys, AtlasFormat, Handle, Vec2};
 use std::ffi::{c_char, c_int, c_void};
 use std::marker::PhantomData;
-use std::ops::RangeInclusive;
 use std::mem::ManuallyDrop;
+use std::ops::RangeInclusive;
 use std::ptr::NonNull;
 use std::sync::Mutex;
 
@@ -77,7 +77,9 @@ impl UserFont {
             (*p).raw.texture = texture;
         }
         // SAFETY: `Box::into_raw` never returns a null pointer.
-        UserFont { inner: unsafe { NonNull::new_unchecked(p) } }
+        UserFont {
+            inner: unsafe { NonNull::new_unchecked(p) },
+        }
     }
 }
 
@@ -97,7 +99,12 @@ impl FontHandle for UserFont {
     }
 }
 
-unsafe extern "C" fn width_cb(h: sys::nk_handle, height: f32, text: *const c_char, len: c_int) -> f32 {
+unsafe extern "C" fn width_cb(
+    h: sys::nk_handle,
+    height: f32,
+    text: *const c_char,
+    len: c_int,
+) -> f32 {
     // SAFETY: `UserFont::new` stores the address of a live `UserFontInner` in `h.ptr`. The `UserFont` outlives every call.
     let font = unsafe { &(*(h.ptr as *const UserFontInner)).font };
     if text.is_null() || len <= 0 {
@@ -348,7 +355,9 @@ impl FontAtlasBuilder {
         let (mut w, mut h) = (0, 0);
         // SAFETY: `atlas` is live. `w` and `h` are writable. On failure Nuklear frees its temporary memory and sets `pixel` to null.
         // stb_truetype reads the font data here. The contract of `add_ttf` makes that data well formed.
-        let px = unsafe { sys::nk_font_atlas_bake(self.atlas.as_ptr(), &mut w, &mut h, format.raw() as _) };
+        let px = unsafe {
+            sys::nk_font_atlas_bake(self.atlas.as_ptr(), &mut w, &mut h, format.raw() as _)
+        };
         if px.is_null() || w <= 0 || h <= 0 {
             return None; // `self` drops here and clears the atlas.
         }
@@ -363,7 +372,11 @@ impl FontAtlasBuilder {
             snaps: unsafe { std::ptr::read(&me.snaps) },
             width: w as u32,
             height: h as u32,
-            bytes_per_pixel: if matches!(format, AtlasFormat::Rgba32) { 4 } else { 1 },
+            bytes_per_pixel: if matches!(format, AtlasFormat::Rgba32) {
+                4
+            } else {
+                1
+            },
         })
     }
 }
@@ -419,7 +432,9 @@ impl BakedAtlas {
         for (&font, _) in me.fonts.iter().zip(&snaps).filter(|(_, &snap)| snap) {
             // SAFETY: `font` is a baked font of the live atlas. Its glyphs are `glyph_count` values in the glyph array of the atlas.
             // Nothing else holds a reference to them, because no `BakedFont` exists before `end` returns.
-            let glyphs = unsafe { std::slice::from_raw_parts_mut((*font).glyphs, (*font).info.glyph_count as usize) };
+            let glyphs = unsafe {
+                std::slice::from_raw_parts_mut((*font).glyphs, (*font).info.glyph_count as usize)
+            };
             for g in glyphs {
                 let (w, h) = (g.x1 - g.x0, g.y1 - g.y0);
                 g.x0 = g.x0.round();
@@ -438,7 +453,13 @@ impl BakedAtlas {
             // SAFETY: the same single move as `fonts`.
             ranges: unsafe { std::ptr::read(&me.ranges) },
         };
-        (atlas, NullTexture { texture: Handle(null.texture), uv: null.uv.into() })
+        (
+            atlas,
+            NullTexture {
+                texture: Handle(null.texture),
+                uv: null.uv.into(),
+            },
+        )
     }
 }
 
@@ -488,7 +509,10 @@ impl FontAtlas {
     /// Get a font. The function returns `None` when `id` is not a valid index of the fonts in this atlas.
     pub fn font(&self, id: FontId) -> Option<BakedFont<'_>> {
         let font = NonNull::new(*self.fonts.get(id.0)?)?;
-        Some(BakedFont { font, _atlas: PhantomData })
+        Some(BakedFont {
+            font,
+            _atlas: PhantomData,
+        })
     }
     /// The number of fonts.
     pub fn len(&self) -> usize {
@@ -551,13 +575,27 @@ mod tests {
 
     struct Fixed;
     impl Font for Fixed {
-        fn height(&self) -> f32 { 12.0 }
-        fn width(&self, _h: f32, t: &str) -> f32 { 6.0 * t.chars().count() as f32 }
-        fn glyph(&self, _h: f32, _c: char, _n: char) -> Glyph { Glyph { width: 6.0, height: 12.0, xadvance: 6.0, ..Default::default() } }
-        fn texture(&self) -> Handle { Handle::id(3) }
+        fn height(&self) -> f32 {
+            12.0
+        }
+        fn width(&self, _h: f32, t: &str) -> f32 {
+            6.0 * t.chars().count() as f32
+        }
+        fn glyph(&self, _h: f32, _c: char, _n: char) -> Glyph {
+            Glyph {
+                width: 6.0,
+                height: 12.0,
+                xadvance: 6.0,
+                ..Default::default()
+            }
+        }
+        fn texture(&self) -> Handle {
+            Handle::id(3)
+        }
     }
 
-    #[test] fn width_callback_reaches_trait() {
+    #[test]
+    fn width_callback_reaches_trait() {
         let f = UserFont::new(Fixed);
         let raw = f.raw();
         // SAFETY: the callback and the userdata come from the same `UserFont`, and the text is valid for 3 bytes.
@@ -566,7 +604,8 @@ mod tests {
         assert_eq!(raw.height, 12.0);
         assert_eq!(Handle(raw.texture).as_id(), 3);
     }
-    #[test] fn query_callback_fills_glyph() {
+    #[test]
+    fn query_callback_fills_glyph() {
         let f = UserFont::new(Fixed);
         let raw = f.raw();
         let mut g = sys::nk_user_font_glyph::default();
@@ -574,47 +613,73 @@ mod tests {
         unsafe { (raw.query.unwrap())(raw.userdata, 12.0, &mut g, 'a' as u32, 0) };
         assert_eq!(g.xadvance, 6.0);
     }
-    #[test] fn null_text_is_empty() {
+    #[test]
+    fn null_text_is_empty() {
         let f = UserFont::new(Fixed);
         let raw = f.raw();
         // SAFETY: the callback and the userdata come from the same `UserFont`. A null text is allowed.
-        assert_eq!(unsafe { (raw.width.unwrap())(raw.userdata, 12.0, std::ptr::null(), 5) }, 0.0);
+        assert_eq!(
+            unsafe { (raw.width.unwrap())(raw.userdata, 12.0, std::ptr::null(), 5) },
+            0.0
+        );
     }
 
     use std::cell::RefCell;
     thread_local! { static SEEN: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) }; }
     struct Rec;
     impl Font for Rec {
-        fn height(&self) -> f32 { 1.0 }
-        fn width(&self, _h: f32, t: &str) -> f32 { SEEN.with(|s| s.borrow_mut().push(t.to_string())); t.len() as f32 }
-        fn glyph(&self, _h: f32, c: char, n: char) -> Glyph { SEEN.with(|s| s.borrow_mut().push(format!("{c}{n}"))); Glyph::default() }
-        fn texture(&self) -> Handle { Handle::id(0) }
+        fn height(&self) -> f32 {
+            1.0
+        }
+        fn width(&self, _h: f32, t: &str) -> f32 {
+            SEEN.with(|s| s.borrow_mut().push(t.to_string()));
+            t.len() as f32
+        }
+        fn glyph(&self, _h: f32, c: char, n: char) -> Glyph {
+            SEEN.with(|s| s.borrow_mut().push(format!("{c}{n}")));
+            Glyph::default()
+        }
+        fn texture(&self) -> Handle {
+            Handle::id(0)
+        }
     }
-    fn make() -> UserFont { UserFont::new(Fixed) }
+    fn make() -> UserFont {
+        UserFont::new(Fixed)
+    }
 
-    #[test] fn moved_font_still_works() {
+    #[test]
+    fn moved_font_still_works() {
         let v = [make(), make()];
         let raw = v[0].raw();
         // SAFETY: the callback and the userdata come from the same `UserFont`, and the text is valid for 3 bytes.
-        assert_eq!(unsafe { (raw.width.unwrap())(raw.userdata, 12.0, c"abc".as_ptr(), 3) }, 18.0);
+        assert_eq!(
+            unsafe { (raw.width.unwrap())(raw.userdata, 12.0, c"abc".as_ptr(), 3) },
+            18.0
+        );
     }
-    #[test] fn null_glyph_returns() {
+    #[test]
+    fn null_glyph_returns() {
         let f = make();
         let raw = f.raw();
         // SAFETY: the callback and the userdata come from the same `UserFont`. A null glyph is allowed.
         unsafe { (raw.query.unwrap())(raw.userdata, 12.0, std::ptr::null_mut(), 'a' as u32, 0) };
     }
-    #[test] fn zero_and_negative_len_are_empty() {
+    #[test]
+    fn zero_and_negative_len_are_empty() {
         let f = UserFont::new(Rec);
         let raw = f.raw();
         SEEN.with(|s| s.borrow_mut().clear());
         for len in [0, -4] {
             // SAFETY: the callback and the userdata come from the same `UserFont`. The callback reads no byte when `len <= 0`.
-            assert_eq!(unsafe { (raw.width.unwrap())(raw.userdata, 1.0, c"abc".as_ptr(), len) }, 0.0);
+            assert_eq!(
+                unsafe { (raw.width.unwrap())(raw.userdata, 1.0, c"abc".as_ptr(), len) },
+                0.0
+            );
         }
         SEEN.with(|s| assert_eq!(*s.borrow(), ["", ""]));
     }
-    #[test] fn invalid_utf8_is_lossy() {
+    #[test]
+    fn invalid_utf8_is_lossy() {
         let f = UserFont::new(Rec);
         let raw = f.raw();
         SEEN.with(|s| s.borrow_mut().clear());
@@ -623,7 +688,8 @@ mod tests {
         unsafe { (raw.width.unwrap())(raw.userdata, 1.0, bytes.as_ptr() as *const c_char, 3) };
         SEEN.with(|s| assert_eq!(*s.borrow(), ["a\u{FFFD}b"]));
     }
-    #[test] fn invalid_codepoint_is_replacement() {
+    #[test]
+    fn invalid_codepoint_is_replacement() {
         let f = UserFont::new(Rec);
         let raw = f.raw();
         SEEN.with(|s| s.borrow_mut().clear());

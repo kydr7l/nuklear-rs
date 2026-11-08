@@ -110,7 +110,10 @@ impl StyleItem {
     /// Make an item that fills with `color`.
     pub fn color(color: Color) -> StyleItem {
         // The default zeroes all bytes of the union.
-        let mut item = sys::nk_style_item { type_: sys::NK_STYLE_ITEM_COLOR, ..Default::default() };
+        let mut item = sys::nk_style_item {
+            type_: sys::NK_STYLE_ITEM_COLOR,
+            ..Default::default()
+        };
         item.data.color = color.into();
         StyleItem(item)
     }
@@ -118,7 +121,10 @@ impl StyleItem {
     /// Make an item that draws `img`.
     pub fn image(img: Image) -> StyleItem {
         // The default zeroes all bytes of the union.
-        let mut item = sys::nk_style_item { type_: sys::NK_STYLE_ITEM_IMAGE, ..Default::default() };
+        let mut item = sys::nk_style_item {
+            type_: sys::NK_STYLE_ITEM_IMAGE,
+            ..Default::default()
+        };
         item.data.image = img.into();
         StyleItem(item)
     }
@@ -652,7 +658,12 @@ mod tests {
 
     #[test]
     fn style_item_keeps_its_color() {
-        let c = Color { r: 1, g: 2, b: 3, a: 4 };
+        let c = Color {
+            r: 1,
+            g: 2,
+            b: 3,
+            a: 4,
+        };
         assert_eq!(StyleItem::color(c).as_color(), Some(c));
         assert_eq!(StyleItem::hide().as_color(), Some(Color::default()));
         assert_eq!(StyleItem::image(Image::default()).as_color(), None);
