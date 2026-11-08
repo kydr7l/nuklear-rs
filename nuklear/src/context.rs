@@ -79,7 +79,7 @@ impl Context<'static> {
 
 impl<'f> Context<'f> {
     /// Make a context that uses `font`. The function returns `None` when Nuklear cannot start or cannot get memory.
-    pub fn new<F: FontHandle>(font: &'f F) -> Option<Context<'f>> {
+    pub fn new<F: FontHandle + ?Sized>(font: &'f F) -> Option<Context<'f>> {
         Context::init(font.raw(), None)
     }
 
@@ -152,7 +152,7 @@ impl<'f> Context<'f> {
     /// }
     /// ctx.clear();
     /// ```
-    pub fn set_font<F: FontHandle>(&mut self, font: &'f F) {
+    pub fn set_font<F: FontHandle + ?Sized>(&mut self, font: &'f F) {
         // SAFETY: the context is valid. The font pointer stays valid for `'f`, and `'f` outlives the context.
         unsafe { sys::nk_style_set_font(self.raw(), font.raw()) }
     }

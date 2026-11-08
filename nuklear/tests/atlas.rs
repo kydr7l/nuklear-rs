@@ -166,3 +166,26 @@ fn snapped_glyphs_sit_on_whole_pixels_at_texel_size() {
         assert_eq!(g.xadvance, g.xadvance.round());
     }
 }
+
+#[test]
+fn a_scaled_font_measures_text_at_its_height() {
+    let mut b = FontAtlasBuilder::new();
+    let id = b.add_default(16.0).unwrap();
+    let (atlas, _) = b.bake(AtlasFormat::Rgba32).unwrap().end(Handle::id(1));
+    let base = atlas.font(id).unwrap();
+    let scaled = base.at_height(32.0);
+    assert_eq!(scaled.height(), 32.0);
+    let one = Context::new(&base).unwrap().text_width("Hello");
+    let two = Context::new(&scaled).unwrap().text_width("Hello");
+    assert!((two / one - 2.0).abs() < 0.05);
+}
+
+#[test]
+fn a_context_takes_a_dyn_font_handle() {
+    let mut b = FontAtlasBuilder::new();
+    let id = b.add_default(16.0).unwrap();
+    let (atlas, _) = b.bake(AtlasFormat::Rgba32).unwrap().end(Handle::id(1));
+    let font = atlas.font(id).unwrap();
+    let handle: &dyn FontHandle = &font;
+    assert_eq!(Context::new(handle).unwrap().font_height(), 16.0);
+}

@@ -68,7 +68,7 @@
 //! - **Vertex layout.** `VertexLayout::new` checks every element, so Nuklear writes only inside each vertex.
 //! - **Buffers.** `Buffer` allocates zeroed memory, so `Buffer::as_bytes` never reads uninitialized bytes.
 //! - **Font atlas.** The types `FontAtlasBuilder`, `BakedAtlas` and `FontAtlas` follow the order of the C calls.
-//!   `BakedFont` borrows the `FontAtlas`. A `FontConfig` sets the glyph ranges and the pixel snap of one font.
+//!   `BakedFont` borrows the `FontAtlas`. `ScaledFont` is a `BakedFont` at another height and borrows the atlas too. A `FontConfig` sets the glyph ranges and the pixel snap of one font.
 //!   The atlas owns the range lists, because Nuklear reads them on every text draw.
 //! - **Text edit.** `TextEdit` owns its `nk_text_edit` in a box, so the struct does not move.
 //! - **Layout and popups.** The context tracks the state of the layout row and the number of open popups.

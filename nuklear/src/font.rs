@@ -539,10 +539,20 @@ pub struct BakedFont<'a> {
     _atlas: PhantomData<&'a FontAtlas>,
 }
 
-impl BakedFont<'_> {
+impl<'a> BakedFont<'a> {
     /// The height of the font in pixels.
     pub fn height(&self) -> f32 {
         self.raw().height
+    }
+    /// A copy of the font that Nuklear draws at `height` pixels. The copy uses the same baked glyphs.
+    /// The copy borrows the atlas like `BakedFont`.
+    pub fn at_height(&self, height: f32) -> ScaledFont<'a> {
+        let mut raw = *self.raw();
+        raw.height = height;
+        ScaledFont {
+            raw,
+            _atlas: PhantomData,
+        }
     }
     /// The baked glyph for `c`. The function returns `None` when the font has no glyph for `c`, so Nuklear would draw the fallback glyph.
     pub fn glyph(&self, c: char) -> Option<Glyph> {
@@ -566,6 +576,31 @@ impl FontHandle for BakedFont<'_> {
         // SAFETY: `font` points into the fonts of a live atlas, because `'a` borrows the `FontAtlas`.
         // `end` set `handle` for each font, and nothing changes it after that.
         unsafe { &(*self.font.as_ptr()).handle }
+    }
+}
+
+/// A `BakedFont` that Nuklear draws at another height. Make it with `BakedFont::at_height`.
+///
+/// The width and glyph callbacks of Nuklear take the height as a parameter.
+/// They scale the baked glyphs by the ratio of that height to the baked height.
+/// So the copy needs no new bake. Like `BakedFont`, the value borrows the `FontAtlas`.
+pub struct ScaledFont<'a> {
+    raw: sys::nk_user_font,
+    _atlas: PhantomData<&'a FontAtlas>,
+}
+
+impl ScaledFont<'_> {
+    /// The height of the font in pixels.
+    pub fn height(&self) -> f32 {
+        self.raw.height
+    }
+}
+
+impl private::Sealed for ScaledFont<'_> {}
+
+impl FontHandle for ScaledFont<'_> {
+    fn raw(&self) -> &sys::nk_user_font {
+        &self.raw
     }
 }
 
