@@ -60,6 +60,35 @@ fn ttf_from_the_system_bakes() {
     let (atlas, _) = b.bake(AtlasFormat::Alpha8).unwrap().end(Handle::id(1));
     assert_eq!(atlas.font(id).unwrap().height(), 16.0);
 }
+fn advance(font: &BakedFont, c: char) -> f32 {
+    let raw = font.raw();
+    let mut buf = [0u8; 4];
+    let s = c.encode_utf8(&mut buf);
+    // SAFETY: the callback and the userdata come from the same baked font, and `s` is valid for its length.
+    unsafe { (raw.width.unwrap())(raw.userdata, raw.height, s.as_ptr().cast(), s.len() as i32) }
+}
+#[test] fn config_sets_the_range_and_the_snap() {
+    let cfg = FontConfig { pixel_snap: true, ranges: vec!['a'..='b', '0'..='9'] };
+    let mut b = FontAtlasBuilder::new();
+    // At 13.5 pixels the built-in font has a fractional advance, so the snap is visible.
+    let snapped = b.add_default_with(13.5, &cfg).unwrap();
+    let plain = b.add_default(13.5).unwrap();
+    let (atlas, _) = b.bake(AtlasFormat::Alpha8).unwrap().end(Handle::id(1));
+    let (snapped, plain) = (atlas.font(snapped).unwrap(), atlas.font(plain).unwrap());
+    assert_ne!(advance(&plain, 'a').fract(), 0.0);
+    assert_eq!(advance(&snapped, 'a').fract(), 0.0);
+    // 'z' is outside the ranges, so it draws as the fallback glyph '?', which is also outside the ranges.
+    assert_eq!(advance(&snapped, 'z'), advance(&snapped, '?'));
+}
+#[test] fn bad_ranges_are_rejected() {
+    let mut b = FontAtlasBuilder::new();
+    // One bad range rejects the whole config, even next to a good one.
+    for ranges in [vec!['a'..='b', 'b'..='a'], vec!['a'..='b', '\0'..='z'], vec!['\u{1}'..=char::MAX, '\u{1}'..=char::MAX]] {
+        let cfg = FontConfig { pixel_snap: false, ranges };
+        assert!(b.add_default_with(13.0, &cfg).is_none(), "{cfg:?}");
+    }
+    assert!(b.bake(AtlasFormat::Alpha8).is_none());
+}
 // The atlas code uses C globals. The crate holds a mutex around them, so atlas builds on many threads must not race.
 #[test] fn atlas_builds_on_many_threads() {
     let threads: Vec<_> = (0..8)

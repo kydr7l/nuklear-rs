@@ -3,6 +3,7 @@
 use crate::{sys, AtlasFormat, Handle, Vec2};
 use std::ffi::{c_char, c_int, c_void};
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 use std::mem::ManuallyDrop;
 use std::ptr::NonNull;
 use std::sync::Mutex;
@@ -169,12 +170,52 @@ pub struct NullTexture {
     pub uv: Vec2,
 }
 
+/// The most glyphs that one font bakes. Nuklear counts the glyphs of a font in an `int`.
+const MAX_GLYPHS: u64 = 0x110000;
+
+/// The settings of one font in the atlas. `Default` gives the Nuklear defaults.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FontConfig {
+    /// Round the advance of every glyph to a whole pixel.
+    pub pixel_snap: bool,
+    /// The code points to bake. An empty list bakes `'\u{20}'..='\u{ff}'`.
+    /// A character that is not in a range draws as `?`.
+    pub ranges: Vec<RangeInclusive<char>>,
+}
+
+impl FontConfig {
+    /// Make the flat, zero-terminated range list that Nuklear reads. The function returns `None` when a range is empty,
+    /// when a range starts at `'\0'` (Nuklear reads 0 as the end of the list), or when the ranges have more than 0x110000 glyphs in total.
+    fn flat_ranges(&self) -> Option<Option<Box<[u32]>>> {
+        if self.ranges.is_empty() {
+            return Some(None);
+        }
+        let mut flat = Vec::with_capacity(self.ranges.len() * 2 + 1);
+        let mut total: u64 = 0;
+        for r in &self.ranges {
+            let (lo, hi) = (*r.start() as u32, *r.end() as u32);
+            if lo == 0 || lo > hi {
+                return None;
+            }
+            total += u64::from(hi - lo) + 1;
+            flat.extend([lo, hi]);
+        }
+        if total > MAX_GLYPHS {
+            return None;
+        }
+        flat.push(0);
+        Some(Some(flat.into_boxed_slice()))
+    }
+}
+
 /// The first step of the font pipeline. Add fonts, then call `bake`.
 pub struct FontAtlasBuilder {
     /// This pointer comes from `Box::into_raw`. Nuklear stores pointers into the allocation, so it must not move.
     atlas: NonNull<sys::nk_font_atlas>,
     /// The fonts in the order of `add_default` and `add_ttf`. Nuklear owns them.
     fonts: Vec<*mut sys::nk_font>,
+    /// The glyph ranges of the fonts. Nuklear keeps a pointer to each list and reads it when it looks up a glyph.
+    ranges: Vec<Box<[u32]>>,
 }
 
 impl Default for FontAtlasBuilder {
@@ -196,7 +237,25 @@ impl FontAtlasBuilder {
             // SAFETY: `Box::into_raw` never returns a null pointer.
             atlas: unsafe { NonNull::new_unchecked(p) },
             fonts: Vec::new(),
+            ranges: Vec::new(),
         }
+    }
+
+    /// Make the C config for one font. The function returns `None` when `height` or `config` is not valid.
+    fn c_config(&mut self, height: f32, config: &FontConfig) -> Option<sys::nk_font_config> {
+        if !height_ok(height) {
+            return None;
+        }
+        let flat = config.flat_ranges()?;
+        // SAFETY: `nk_font_config` only fills a struct with constants and the default range pointer.
+        let mut cfg = unsafe { sys::nk_font_config(height) };
+        cfg.pixel_snap = config.pixel_snap.into();
+        if let Some(flat) = flat {
+            cfg.range = flat.as_ptr();
+            // The box never moves, and `ranges` lives as long as the atlas, so the pointer stays valid.
+            self.ranges.push(flat);
+        }
+        Some(cfg)
     }
 
     fn push(&mut self, font: *mut sys::nk_font) -> Option<FontId> {
@@ -214,14 +273,18 @@ impl FontAtlasBuilder {
     /// Nuklear omits the glyphs that do not fit, and it gives no error.
     /// All fonts in one atlas share this space.
     pub fn add_default(&mut self, height: f32) -> Option<FontId> {
-        if !height_ok(height) {
-            return None;
-        }
+        self.add_default_with(height, &FontConfig::default())
+    }
+
+    /// Add the built-in font with a `FontConfig`. See `add_default` for the height rule and the image size.
+    /// The function also returns `None` when a range in `config` is empty, starts at `'\0'`, or when the ranges have more than 0x110000 glyphs.
+    pub fn add_default_with(&mut self, height: f32, config: &FontConfig) -> Option<FontId> {
+        let cfg = self.c_config(height, config)?;
         // Nuklear decompresses the built-in font with C globals (`nk__barrier`, `nk__dout`). Two threads would race on them.
         static DECOMPRESS: Mutex<()> = Mutex::new(());
         let _guard = DECOMPRESS.lock().unwrap_or_else(|e| e.into_inner());
-        // SAFETY: `atlas` is live and in the state after `begin`. A null config selects the default config. The lock above serializes the C globals.
-        let font = unsafe { sys::nk_font_atlas_add_default(self.atlas.as_ptr(), height, std::ptr::null()) };
+        // SAFETY: `atlas` is live and in the state after `begin`. Nuklear copies `cfg`, and `ranges` keeps the range list alive. The lock above serializes the C globals.
+        let font = unsafe { sys::nk_font_atlas_add_default(self.atlas.as_ptr(), height, &cfg) };
         self.push(font)
     }
 
@@ -240,18 +303,30 @@ impl FontAtlasBuilder {
     /// Bad data causes out-of-bounds reads when `bake` runs, not when this function runs.
     /// For this reason this function is unsafe. The contract also covers the call to `bake`, which reads the data.
     pub unsafe fn add_ttf(&mut self, ttf: &[u8], height: f32) -> Option<FontId> {
+        // SAFETY: the caller gives well-formed font data, as this function requires.
+        unsafe { self.add_ttf_with(ttf, height, &FontConfig::default()) }
+    }
+
+    /// Add a font from TrueType or OpenType data with a `FontConfig`. See `add_ttf` for the height rule and the image size.
+    /// The function also returns `None` when a range in `config` is empty, starts at `'\0'`, or when the ranges have more than 0x110000 glyphs.
+    ///
+    /// # Safety
+    /// The same contract as `add_ttf`: `ttf` must be one complete, well-formed TrueType or OpenType file, or a collection.
+    pub unsafe fn add_ttf_with(&mut self, ttf: &[u8], height: f32, config: &FontConfig) -> Option<FontId> {
         // An empty `ttf` would reach `NK_ASSERT(size)` in Nuklear, which aborts.
-        if !height_ok(height) || ttf.is_empty() {
+        if ttf.is_empty() {
             return None;
         }
+        let cfg = self.c_config(height, config)?;
         // SAFETY: `atlas` is live. `ttf` is readable for its length, and Nuklear only reads it. The caller promises that the data is well formed.
+        // Nuklear copies `cfg`, and `ranges` keeps the range list alive.
         let font = unsafe {
             sys::nk_font_atlas_add_from_memory(
                 self.atlas.as_ptr(),
                 ttf.as_ptr() as *mut c_void,
                 ttf.len(),
                 height,
-                std::ptr::null(),
+                &cfg,
             )
         };
         self.push(font)
@@ -278,6 +353,8 @@ impl FontAtlasBuilder {
             atlas: me.atlas,
             // SAFETY: `me` is never used or dropped again, so this read moves the `Vec` out once.
             fonts: unsafe { std::ptr::read(&me.fonts) },
+            // SAFETY: the same single move as `fonts`.
+            ranges: unsafe { std::ptr::read(&me.ranges) },
             width: w as u32,
             height: h as u32,
             bytes_per_pixel: if matches!(format, AtlasFormat::Rgba32) { 4 } else { 1 },
@@ -297,6 +374,7 @@ pub struct BakedAtlas {
     /// This pointer comes from `Box::into_raw`. The fonts point back into the allocation.
     atlas: NonNull<sys::nk_font_atlas>,
     fonts: Vec<*mut sys::nk_font>,
+    ranges: Vec<Box<[u32]>>,
     width: u32,
     height: u32,
     bytes_per_pixel: usize,
@@ -332,6 +410,8 @@ impl BakedAtlas {
             atlas: me.atlas,
             // SAFETY: `me` is never used or dropped again, so this read moves the `Vec` out once.
             fonts: unsafe { std::ptr::read(&me.fonts) },
+            // SAFETY: the same single move as `fonts`.
+            ranges: unsafe { std::ptr::read(&me.ranges) },
         };
         (atlas, NullTexture { texture: Handle(null.texture), uv: null.uv.into() })
     }
@@ -374,6 +454,9 @@ pub struct FontAtlas {
     /// This pointer comes from `Box::into_raw`. The fonts point back into the allocation.
     atlas: NonNull<sys::nk_font_atlas>,
     fonts: Vec<*mut sys::nk_font>,
+    /// The glyph ranges. `nk_font_find_glyph` reads them on every text draw, so they live as long as the fonts.
+    #[allow(dead_code)]
+    ranges: Vec<Box<[u32]>>,
 }
 
 impl FontAtlas {
