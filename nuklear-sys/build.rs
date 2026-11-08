@@ -1,6 +1,9 @@
 use std::{env, path::PathBuf};
 
 fn main() {
+    if !std::path::Path::new("nuklear/nuklear.h").exists() {
+        panic!("nuklear/nuklear.h is missing. Run `git submodule update --init` in the repository root.");
+    }
     // The flags remove the undefined behaviour of C signed overflow and aliasing on gcc and clang.
     cc::Build::new()
         .file("src/nuklear.c")

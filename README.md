@@ -4,12 +4,14 @@ Rust bindings for [Nuklear](https://github.com/Immediate-Mode-UI/Nuklear), a sin
 
 ## Crates
 
-- `nuklear-sys` has the raw FFI bindings. It compiles the vendored `nuklear.h` and generates the Rust declarations with `bindgen`.
+- `nuklear-sys` has the raw FFI bindings. It compiles `nuklear.h` from the git submodule `nuklear-sys/nuklear` and generates the Rust declarations with `bindgen`.
 - `nuklear` is the safe wrapper. Its only runtime dependency is `nuklear-sys`.
 
 The crates have no render backend and no window code. A program feeds input, builds the widgets, and reads back draw commands or a vertex buffer.
 
 ## Build requirements
+
+- The Nuklear submodule. Clone with `git clone --recurse-submodules`, or run `git submodule update --init` in an existing clone.
 
 - A C compiler. The `cc` crate finds it.
 - libclang, for `bindgen`. On Windows, install LLVM and set `LIBCLANG_PATH` to its `bin` directory if `bindgen` does not find it.

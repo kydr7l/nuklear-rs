@@ -1,8 +1,8 @@
 //! Raw FFI bindings to Nuklear.
 //!
-//! The crate compiles the vendored `nuklear.h` and generates the Rust declarations with `bindgen` at build time.
+//! The crate compiles `nuklear.h` from the git submodule `nuklear` and generates the Rust declarations with `bindgen` at build time.
 //! Every `nk_*` function, type and `NK_*` constant of the header is public here.
-//! The upstream commit is in the file `nuklear/VERSION`.
+//! The submodule pins the upstream commit.
 //!
 //! The functions are `unsafe`, and Nuklear checks its preconditions with `NK_ASSERT`.
 //! A failed assertion calls [`nk_rs_assert_fail`], which prints the expression and aborts the process.

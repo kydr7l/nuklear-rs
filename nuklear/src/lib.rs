@@ -1,6 +1,6 @@
 //! Safe Rust wrapper for the Nuklear immediate mode GUI library.
 //!
-//! The crate wraps Nuklear (pinned to the commit in `nuklear-sys/nuklear/VERSION`) and has no other runtime dependency than `nuklear-sys`.
+//! The crate wraps Nuklear (pinned by the git submodule `nuklear-sys/nuklear`) and has no other runtime dependency than `nuklear-sys`.
 //! It has no render backend and no window code. A program runs a full frame without a display,
 //! and it reads the result as draw commands (`Context::commands`) or as vertex data (`Context::convert`).
 //! The popups, combo boxes, contextual menus, menus and charts are in the module `containers`, not in `window`. The crate root re-exports every public type.
