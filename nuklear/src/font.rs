@@ -178,6 +178,9 @@ const MAX_GLYPHS: u64 = 0x110000;
 pub struct FontConfig {
     /// Round the advance of every glyph to a whole pixel.
     pub pixel_snap: bool,
+    /// Put each glyph on whole pixels at the size of its atlas texels after the bake.
+    /// The linear sampler then does not blur small text.
+    pub snap_glyphs: bool,
     /// The code points to bake. An empty list bakes `'\u{20}'..='\u{ff}'`.
     /// A character that is not in a range draws as `?`.
     pub ranges: Vec<RangeInclusive<char>>,
@@ -216,6 +219,8 @@ pub struct FontAtlasBuilder {
     fonts: Vec<*mut sys::nk_font>,
     /// The glyph ranges of the fonts. Nuklear keeps a pointer to each list and reads it when it looks up a glyph.
     ranges: Vec<Box<[u32]>>,
+    /// For each font in `fonts`: `true` when `BakedAtlas::end` snaps the glyphs of the font.
+    snaps: Vec<bool>,
 }
 
 impl Default for FontAtlasBuilder {
@@ -238,6 +243,7 @@ impl FontAtlasBuilder {
             atlas: unsafe { NonNull::new_unchecked(p) },
             fonts: Vec::new(),
             ranges: Vec::new(),
+            snaps: Vec::new(),
         }
     }
 
@@ -258,11 +264,12 @@ impl FontAtlasBuilder {
         Some(cfg)
     }
 
-    fn push(&mut self, font: *mut sys::nk_font) -> Option<FontId> {
+    fn push(&mut self, font: *mut sys::nk_font, snap: bool) -> Option<FontId> {
         if font.is_null() {
             return None;
         }
         self.fonts.push(font);
+        self.snaps.push(snap);
         Some(FontId(self.fonts.len() - 1))
     }
 
@@ -285,7 +292,7 @@ impl FontAtlasBuilder {
         let _guard = DECOMPRESS.lock().unwrap_or_else(|e| e.into_inner());
         // SAFETY: `atlas` is live and in the state after `begin`. Nuklear copies `cfg`, and `ranges` keeps the range list alive. The lock above serializes the C globals.
         let font = unsafe { sys::nk_font_atlas_add_default(self.atlas.as_ptr(), height, &cfg) };
-        self.push(font)
+        self.push(font, config.snap_glyphs)
     }
 
     /// Add a font from TrueType or OpenType data. The atlas copies the bytes before the function returns.
@@ -325,7 +332,7 @@ impl FontAtlasBuilder {
                 &cfg,
             )
         };
-        self.push(font)
+        self.push(font, config.snap_glyphs)
     }
 
     /// Draw the glyphs into an image. The function returns `None` when no font was added or when Nuklear fails.
@@ -352,6 +359,8 @@ impl FontAtlasBuilder {
             fonts: unsafe { std::ptr::read(&me.fonts) },
             // SAFETY: the same single move as `fonts`.
             ranges: unsafe { std::ptr::read(&me.ranges) },
+            // SAFETY: the same single move as `fonts`.
+            snaps: unsafe { std::ptr::read(&me.snaps) },
             width: w as u32,
             height: h as u32,
             bytes_per_pixel: if matches!(format, AtlasFormat::Rgba32) { 4 } else { 1 },
@@ -372,6 +381,8 @@ pub struct BakedAtlas {
     atlas: NonNull<sys::nk_font_atlas>,
     fonts: Vec<*mut sys::nk_font>,
     ranges: Vec<Box<[u32]>>,
+    /// The snap flags of the fonts, as in `FontAtlasBuilder`.
+    snaps: Vec<bool>,
     width: u32,
     height: u32,
     bytes_per_pixel: usize,
@@ -402,6 +413,23 @@ impl BakedAtlas {
         unsafe {
             sys::nk_font_atlas_end(me.atlas.as_ptr(), texture.0, &mut null);
             sys::nk_font_atlas_cleanup(me.atlas.as_ptr());
+        }
+        // SAFETY: `me` is never used or dropped again, so this read moves the `Vec` out once.
+        let snaps = unsafe { std::ptr::read(&me.snaps) };
+        for (&font, _) in me.fonts.iter().zip(&snaps).filter(|(_, &snap)| snap) {
+            // SAFETY: `font` is a baked font of the live atlas. Its glyphs are `glyph_count` values in the glyph array of the atlas.
+            // Nothing else holds a reference to them, because no `BakedFont` exists before `end` returns.
+            let glyphs = unsafe { std::slice::from_raw_parts_mut((*font).glyphs, (*font).info.glyph_count as usize) };
+            for g in glyphs {
+                let (w, h) = (g.x1 - g.x0, g.y1 - g.y0);
+                g.x0 = g.x0.round();
+                g.y0 = g.y0.round();
+                g.x1 = g.x0 + w;
+                g.y1 = g.y0 + h;
+                g.w = w;
+                g.h = h;
+                g.xadvance = g.xadvance.round();
+            }
         }
         let atlas = FontAtlas {
             atlas: me.atlas,
@@ -491,6 +519,19 @@ impl BakedFont<'_> {
     /// The height of the font in pixels.
     pub fn height(&self) -> f32 {
         self.raw().height
+    }
+    /// The baked glyph for `c`. The function returns `None` when the font has no glyph for `c`, so Nuklear would draw the fallback glyph.
+    pub fn glyph(&self, c: char) -> Option<Glyph> {
+        // SAFETY: `font` points into the fonts of a live atlas, because `'a` borrows the `FontAtlas`. The function only reads.
+        let g = unsafe { sys::nk_font_find_glyph(self.font.as_ptr(), c as u32).as_ref()? };
+        // The function returns the fallback glyph for a missing code point. It carries the code point of the fallback.
+        (g.codepoint == c as u32).then_some(Glyph {
+            uv: [Vec2 { x: g.u0, y: g.v0 }, Vec2 { x: g.u1, y: g.v1 }],
+            offset: Vec2 { x: g.x0, y: g.y0 },
+            width: g.w,
+            height: g.h,
+            xadvance: g.xadvance,
+        })
     }
 }
 

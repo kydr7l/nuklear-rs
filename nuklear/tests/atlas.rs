@@ -65,7 +65,7 @@ fn advance(font: &BakedFont, c: char) -> f32 {
     unsafe { (raw.width.unwrap())(raw.userdata, raw.height, s.as_ptr().cast(), s.len() as i32) }
 }
 #[test] fn config_sets_the_range_and_the_snap() {
-    let cfg = FontConfig { pixel_snap: true, ranges: vec!['a'..='b', '0'..='9'] };
+    let cfg = FontConfig { pixel_snap: true, snap_glyphs: false, ranges: vec!['a'..='b', '0'..='9'] };
     let mut b = FontAtlasBuilder::new();
     // At 13.5 pixels the built-in font has a fractional advance, so the snap is visible.
     let snapped = b.add_default_with(13.5, &cfg).unwrap();
@@ -81,7 +81,7 @@ fn advance(font: &BakedFont, c: char) -> f32 {
     let mut b = FontAtlasBuilder::new();
     // One bad range rejects the whole config, even next to a good one.
     for ranges in [vec!['a'..='b', 'b'..='a'], vec!['a'..='b', '\0'..='z'], vec!['\u{1}'..=char::MAX, '\u{1}'..=char::MAX]] {
-        let cfg = FontConfig { pixel_snap: false, ranges };
+        let cfg = FontConfig { pixel_snap: false, snap_glyphs: false, ranges };
         assert!(b.add_default_with(13.0, &cfg).is_none(), "{cfg:?}");
     }
     assert!(b.bake(AtlasFormat::Alpha8).is_none());
@@ -102,5 +102,23 @@ fn advance(font: &BakedFont, c: char) -> f32 {
         .collect();
     for t in threads {
         t.join().unwrap();
+    }
+}
+#[test]
+fn snapped_glyphs_sit_on_whole_pixels_at_texel_size() {
+    let mut b = FontAtlasBuilder::new();
+    let config = FontConfig { snap_glyphs: true, ..FontConfig::default() };
+    let id = b.add_default_with(13.0, &config).unwrap();
+    let baked = b.bake(AtlasFormat::Rgba32).unwrap();
+    let (w, h) = (baked.width() as f32, baked.height() as f32);
+    let (atlas, _) = baked.end(Handle::id(1));
+    let font = atlas.font(id).unwrap();
+    for c in 'A'..='Z' {
+        let g = font.glyph(c).unwrap();
+        assert_eq!(g.offset.x, g.offset.x.round());
+        assert_eq!(g.offset.y, g.offset.y.round());
+        assert!((g.width - (g.uv[1].x - g.uv[0].x) * w).abs() < 0.01);
+        assert!((g.height - (g.uv[1].y - g.uv[0].y) * h).abs() < 0.01);
+        assert_eq!(g.xadvance, g.xadvance.round());
     }
 }
