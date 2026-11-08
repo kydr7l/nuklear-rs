@@ -32,9 +32,9 @@ cargo run -p nuklear --release --example demo
 
 ## Safety
 
-No safe code causes undefined behaviour. Misuse that the wrapper does not model aborts the process and prints the failed Nuklear assertion.
+No safe code causes undefined behaviour, except bad font data given to `FontAtlasBuilder::add_ttf` or `FontAtlasBuilder::add_ttf_with`. Misuse that the wrapper does not model aborts the process and prints the failed Nuklear assertion.
 A panic in the body of a scope (a window, a group, a popup and the others) also aborts the process.
-The crate docs of `nuklear` give the safety rules and the known limitations. The only `unsafe fn` is `FontAtlasBuilder::add_ttf`.
+The crate docs of `nuklear` give the safety rules and the known limitations. The crate has no public `unsafe fn`. `add_ttf` and `add_ttf_with` trust their font data, and stb_truetype reads out of bounds on bad data.
 
 ## Not included
 

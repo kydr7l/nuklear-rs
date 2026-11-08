@@ -39,23 +39,20 @@ use nuklear::*;
     let mut b = FontAtlasBuilder::new();
     for h in [0.0, -1.0, f32::NAN, f32::INFINITY, 512.5, 1.0e9] {
         assert!(b.add_default(h).is_none(), "height {h}");
-        // SAFETY: the height check fails first, so Nuklear never reads the bytes.
-        assert!(unsafe { b.add_ttf(&[], h) }.is_none(), "height {h}");
+        assert!(b.add_ttf(&[], h).is_none(), "height {h}");
     }
     assert!(b.bake(AtlasFormat::Alpha8).is_none());
 }
 #[test] fn empty_ttf_is_rejected() {
     let mut b = FontAtlasBuilder::new();
-    // SAFETY: the empty check fails first, so Nuklear never reads the bytes.
-    assert!(unsafe { b.add_ttf(&[], 13.0) }.is_none());
+    assert!(b.add_ttf(&[], 13.0).is_none());
 }
 #[test]
 #[cfg_attr(not(windows), ignore = "needs C:/Windows/Fonts/arial.ttf")]
 fn ttf_from_the_system_bakes() {
     let ttf = std::fs::read("C:/Windows/Fonts/arial.ttf").expect("C:/Windows/Fonts/arial.ttf ships with Windows");
     let mut b = FontAtlasBuilder::new();
-    // SAFETY: the file is a well-formed TrueType font that ships with Windows.
-    let id = unsafe { b.add_ttf(&ttf, 16.0) }.unwrap();
+    let id = b.add_ttf(&ttf, 16.0).unwrap();
     drop(ttf); // The atlas copies the bytes.
     let (atlas, _) = b.bake(AtlasFormat::Alpha8).unwrap().end(Handle::id(1));
     assert_eq!(atlas.font(id).unwrap().height(), 16.0);

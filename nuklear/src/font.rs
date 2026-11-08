@@ -296,29 +296,25 @@ impl FontAtlasBuilder {
     /// Nuklear omits the glyphs that do not fit, and it gives no error.
     /// All fonts in one atlas share this space.
     ///
-    /// # Safety
     /// `ttf` must be one complete, well-formed TrueType or OpenType file, or a collection. The atlas uses font 0 of a collection.
-    /// The tables and the font metrics in `ttf` must be valid.
-    /// stb_truetype trusts the offsets in the data. It does not check them against `ttf.len()`.
-    /// Bad data causes out-of-bounds reads when `bake` runs, not when this function runs.
-    /// For this reason this function is unsafe. The contract also covers the call to `bake`, which reads the data.
-    pub unsafe fn add_ttf(&mut self, ttf: &[u8], height: f32) -> Option<FontId> {
-        // SAFETY: the caller gives well-formed font data, as this function requires.
-        unsafe { self.add_ttf_with(ttf, height, &FontConfig::default()) }
+    /// stb_truetype trusts the offsets in the data and does not check them against the length.
+    /// Bad data causes out-of-bounds reads when `bake` runs.
+    /// Font data from `include_bytes!` of a font file meets this contract.
+    pub fn add_ttf(&mut self, ttf: &[u8], height: f32) -> Option<FontId> {
+        self.add_ttf_with(ttf, height, &FontConfig::default())
     }
 
     /// Add a font from TrueType or OpenType data with a `FontConfig`. See `add_ttf` for the height rule and the image size.
     /// The function also returns `None` when a range in `config` is empty, starts at `'\0'`, or when the ranges have more than 0x110000 glyphs.
     ///
-    /// # Safety
-    /// The same contract as `add_ttf`: `ttf` must be one complete, well-formed TrueType or OpenType file, or a collection.
-    pub unsafe fn add_ttf_with(&mut self, ttf: &[u8], height: f32, config: &FontConfig) -> Option<FontId> {
+    /// The same contract as `add_ttf` applies to `ttf`.
+    pub fn add_ttf_with(&mut self, ttf: &[u8], height: f32, config: &FontConfig) -> Option<FontId> {
         // An empty `ttf` would reach `NK_ASSERT(size)` in Nuklear, which aborts.
         if ttf.is_empty() {
             return None;
         }
         let cfg = self.c_config(height, config)?;
-        // SAFETY: `atlas` is live. `ttf` is readable for its length, and Nuklear only reads it. The caller promises that the data is well formed.
+        // SAFETY: `atlas` is live. `ttf` is readable for its length, and Nuklear only reads it. The contract of this function makes `ttf` well-formed font data.
         // Nuklear copies `cfg`, and `ranges` keeps the range list alive.
         let font = unsafe {
             sys::nk_font_atlas_add_from_memory(

@@ -95,11 +95,11 @@
 //!   After an unwind, Nuklear would keep pointers into freed Rust memory, for example the scroll offset of `Window::group_scrolled`.
 //! - A panic inside a `Font` method aborts, because the panic cannot unwind through the C code.
 //!
-//! # The unsafe function
+//! # Font data
 //!
-//! The crate has exactly one public `unsafe fn`: `FontAtlasBuilder::add_ttf`. The stb_truetype code in Nuklear reads out of
-//! bounds on a malformed font file. The caller must give a well-formed TrueType or OpenType file.
-//! `FontAtlasBuilder::add_default` uses the built-in font and is safe.
+//! The crate has no public `unsafe fn`. `FontAtlasBuilder::add_ttf` and `FontAtlasBuilder::add_ttf_with` trust their font data.
+//! The stb_truetype code in Nuklear reads out of bounds on a malformed font file. The caller must give a well-formed TrueType or OpenType file.
+//! `FontAtlasBuilder::add_default` uses the built-in font and has no contract.
 //!
 //! # Known limitations
 //!
